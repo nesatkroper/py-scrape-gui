@@ -10,8 +10,11 @@ clear:
 i: 
 	pip install -r requirements.txt
 
-dev:
+sc:
 	python pyscrape.py
+
+tu:
+	python pytube.py
 
 py:
 	. venv/bin/activate.fish; exec fish

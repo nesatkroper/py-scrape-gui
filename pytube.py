@@ -6,16 +6,15 @@ import yt_dlp
 import threading
 import os
 import queue
-import re
 from urllib.parse import urlparse
-from datetime import datetime
+import re
 
 
-class VideoDownloaderApp(ttk.Window):
+class TikTokProfileDownloader(ttk.Window):
     def __init__(self):
         super().__init__(themename="darkly")
-        self.title("Video Downloader (YouTube & TikTok)")
-        self.geometry("800x600")
+        self.title("TikTok Profile Downloader")
+        self.geometry("700x500")
         self.download_thread = None
         self.stop_event = threading.Event()
         self.log_queue = queue.Queue()
@@ -23,9 +22,9 @@ class VideoDownloaderApp(ttk.Window):
         self.after(100, self.process_queue)
 
         # Default save path
-        default_path = os.path.join(os.path.expanduser("~"), "Downloads")
+        default_path = os.path.join(os.path.expanduser("~"), "TikTok_Downloads")
         if not os.path.exists(default_path):
-            default_path = os.getcwd()
+            os.makedirs(default_path, exist_ok=True)
         self.default_save_path = default_path
 
         self.build_ui()
@@ -34,23 +33,23 @@ class VideoDownloaderApp(ttk.Window):
         main_frame = ttk.Frame(self, padding=20)
         main_frame.pack(fill="both", expand=True)
 
-        # URL Frame
+        # Profile URL Frame
         url_frame = ttk.Frame(main_frame)
         url_frame.pack(fill="x", pady=10)
         ttk.Label(
-            url_frame, text="Enter URL (YouTube or TikTok):", font=("Helvetica", 12)
+            url_frame, text="TikTok Profile URL:", font=("Helvetica", 12, "bold")
         ).pack(side="left", padx=5)
         self.url_entry = ttk.Entry(url_frame, width=50, font=("Helvetica", 10))
         self.url_entry.pack(side="left", fill="x", expand=True, padx=5)
 
-        # Help text
-        help_label = ttk.Label(
+        # Example URL
+        example_label = ttk.Label(
             main_frame,
-            text="YouTube: Single video/playlist/channel URLs | TikTok: Profile URL[](https://www.tiktok.com/@username)",
-            font=("Helvetica", 10),
+            text="Example: https://www.tiktok.com/@username",
+            font=("Helvetica", 9),
             foreground="gray",
         )
-        help_label.pack(fill="x", pady=(0, 10))
+        example_label.pack(anchor="w", pady=(0, 10))
 
         # Save location frame
         save_frame = ttk.Frame(main_frame)
@@ -77,53 +76,82 @@ class VideoDownloaderApp(ttk.Window):
         options_frame = ttk.LabelFrame(main_frame, text="Download Options", padding=10)
         options_frame.pack(fill="x", pady=10)
 
-        self.download_scope = tk.StringVar(value="single")
-        ttk.Radiobutton(
-            options_frame,
-            text="Single Video",
-            variable=self.download_scope,
-            value="single",
-            style="info.TRadiobutton",
-        ).pack(anchor="w", pady=2)
-        ttk.Radiobutton(
-            options_frame,
-            text="Entire Playlist (YouTube)",
-            variable=self.download_scope,
-            value="playlist",
-            style="info.TRadiobutton",
-        ).pack(anchor="w", pady=2)
-        ttk.Radiobutton(
-            options_frame,
-            text="All Videos from Channel/Profile",
-            variable=self.download_scope,
-            value="channel",
-            style="info.TRadiobutton",
-        ).pack(anchor="w", pady=2)
-
+        # Download type
         self.download_type = tk.StringVar(value="video")
         ttk.Radiobutton(
             options_frame,
-            text="Download as Video",
+            text="Download Videos (MP4)",
             variable=self.download_type,
             value="video",
             style="info.TRadiobutton",
-        ).pack(anchor="w", pady=5)
+        ).pack(anchor="w", pady=2)
         ttk.Radiobutton(
             options_frame,
-            text="Download as Audio Only",
+            text="Download Audio Only (MP3)",
             variable=self.download_type,
             value="audio",
             style="info.TRadiobutton",
         ).pack(anchor="w", pady=2)
 
+        # Video quality
+        ttk.Separator(options_frame, orient="horizontal").pack(fill="x", pady=10)
+        ttk.Label(
+            options_frame, text="Video Quality:", font=("Helvetica", 10, "bold")
+        ).pack(anchor="w", pady=(0, 5))
+
+        self.quality_var = tk.StringVar(value="best")
+        quality_frame = ttk.Frame(options_frame)
+        quality_frame.pack(fill="x", pady=2)
+
+        ttk.Radiobutton(
+            quality_frame,
+            text="Best Quality",
+            variable=self.quality_var,
+            value="best",
+            style="info.TRadiobutton",
+        ).pack(side="left", padx=10)
+        ttk.Radiobutton(
+            quality_frame,
+            text="720p (Faster)",
+            variable=self.quality_var,
+            value="720p",
+            style="info.TRadiobutton",
+        ).pack(side="left", padx=10)
+
+        # Max videos
+        ttk.Separator(options_frame, orient="horizontal").pack(fill="x", pady=10)
+        ttk.Label(
+            options_frame,
+            text="Maximum videos to download:",
+            font=("Helvetica", 10, "bold"),
+        ).pack(anchor="w", pady=(0, 5))
+
+        max_frame = ttk.Frame(options_frame)
+        max_frame.pack(fill="x", pady=2)
+        self.max_videos_var = tk.StringVar(value="all")
+        ttk.Radiobutton(
+            max_frame,
+            text="All Videos",
+            variable=self.max_videos_var,
+            value="all",
+            style="info.TRadiobutton",
+        ).pack(side="left", padx=10)
+
+        self.max_videos_entry = ttk.Entry(max_frame, width=10, font=("Helvetica", 10))
+        self.max_videos_entry.pack(side="left", padx=(20, 5))
+        ttk.Label(max_frame, text="videos", font=("Helvetica", 10)).pack(
+            side="left", padx=5
+        )
+
         # Control frame
         control_frame = ttk.Frame(main_frame)
-        control_frame.pack(fill="x", pady=10)
+        control_frame.pack(fill="x", pady=15)
         self.start_btn = ttk.Button(
             control_frame,
             text="Start Download",
             command=self.start_download,
             style="success.TButton",
+            width=15,
         )
         self.start_btn.pack(side="left", padx=5)
         self.stop_btn = ttk.Button(
@@ -132,6 +160,7 @@ class VideoDownloaderApp(ttk.Window):
             command=self.stop_download,
             style="danger.TButton",
             state="disabled",
+            width=10,
         )
         self.stop_btn.pack(side="left", padx=5)
         ttk.Button(
@@ -139,29 +168,44 @@ class VideoDownloaderApp(ttk.Window):
             text="Copy Errors",
             command=self.copy_errors,
             style="warning.TButton",
+            width=12,
         ).pack(side="left", padx=5)
 
-        # Progress bar
+        # Progress frame
+        progress_frame = ttk.Frame(main_frame)
+        progress_frame.pack(fill="x", pady=10)
+
+        ttk.Label(
+            progress_frame, text="Progress:", font=("Helvetica", 11, "bold")
+        ).pack(anchor="w")
         self.progress = ttk.Progressbar(
-            main_frame, mode="determinate", style="success.TProgressbar"
+            progress_frame, mode="determinate", style="success.TProgressbar"
         )
-        self.progress.pack(fill="x", pady=10)
+        self.progress.pack(fill="x", pady=(2, 0))
+
+        # Stats frame
+        stats_frame = ttk.Frame(main_frame)
+        stats_frame.pack(fill="x", pady=5)
+        self.stats_label = ttk.Label(
+            stats_frame, text="Files: 0 | Profile: Not loaded", font=("Helvetica", 10)
+        )
+        self.stats_label.pack(anchor="w")
 
         # Log text area
-        self.log_text = ttk.Text(main_frame, height=10, font=("Helvetica", 9))
-        self.log_text.pack(fill="both", expand=True, pady=10)
+        log_frame = ttk.LabelFrame(main_frame, text="Download Log", padding=5)
+        log_frame.pack(fill="both", expand=True, pady=10)
 
-        # File count
-        ttk.Label(main_frame, text="Files downloaded:", font=("Helvetica", 12)).pack(
-            anchor="w", pady=5
+        self.log_text = ttk.Text(log_frame, height=8, font=("Helvetica", 9))
+        scrollbar = ttk.Scrollbar(
+            log_frame, orient="vertical", command=self.log_text.yview
         )
-        self.file_count = tk.IntVar(value=0)
-        ttk.Label(
-            main_frame, textvariable=self.file_count, font=("Helvetica", 12)
-        ).pack(anchor="w", pady=5)
+        self.log_text.configure(yscrollcommand=scrollbar.set)
 
-    def validate_url(self, url):
-        """Validate if URL is from supported platforms"""
+        self.log_text.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+    def validate_tiktok_url(self, url):
+        """Validate TikTok profile URL"""
         if not url:
             return False, "URL cannot be empty"
 
@@ -170,15 +214,20 @@ class VideoDownloaderApp(ttk.Window):
             if not parsed.scheme or not parsed.netloc:
                 return False, "Invalid URL format"
 
-            # YouTube validation
-            if "youtube.com" in parsed.netloc or "youtu.be" in parsed.netloc:
-                return True, "YouTube URL detected"
+            if "tiktok.com" not in parsed.netloc:
+                return False, "Please enter a TikTok URL"
 
-            # TikTok validation
-            if "tiktok.com" in parsed.netloc:
-                return True, "TikTok URL detected"
+            # Extract username
+            path_parts = parsed.path.strip("/").split("/")
+            if len(path_parts) >= 1 and path_parts[0].startswith("@"):
+                username = path_parts[0][1:]  # Remove @
+                if username:
+                    return True, f"TikTok profile detected: @{username}"
 
-            return False, "Unsupported platform. Only YouTube and TikTok are supported."
+            return (
+                False,
+                "Invalid TikTok profile URL. Use format: https://www.tiktok.com/@username",
+            )
 
         except Exception as e:
             return False, f"URL parsing error: {str(e)}"
@@ -222,7 +271,7 @@ class VideoDownloaderApp(ttk.Window):
     def start_download(self):
         # Validate URL
         url = self.url_entry.get().strip()
-        is_valid, message = self.validate_url(url)
+        is_valid, message = self.validate_tiktok_url(url)
         if not is_valid:
             messagebox.showerror("Error", message)
             return
@@ -239,30 +288,41 @@ class VideoDownloaderApp(ttk.Window):
                 messagebox.showerror("Error", f"Cannot access save location: {str(e)}")
                 return
 
-        # Confirm large downloads
-        scope = self.download_scope.get()
-        if scope in ["playlist", "channel"]:
-            confirm = messagebox.askyesno(
-                "Large Download",
-                f"Downloading {scope} may take a long time and use significant storage.\nContinue?",
-            )
-            if not confirm:
+        # Get max videos
+        max_videos = self.max_videos_var.get()
+        if max_videos != "all":
+            try:
+                max_videos = int(self.max_videos_entry.get())
+                if max_videos <= 0:
+                    raise ValueError("Must be positive")
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid number of videos")
                 return
+
+        # Confirm large downloads
+        confirm = messagebox.askyesno(
+            "Confirm Download",
+            f"Download all videos from TikTok profile?\n\nThis may take a long time and use significant storage space.\n\nContinue?",
+        )
+        if not confirm:
+            return
 
         # Start download
         self.stop_event.clear()
         self.error_logs = []
         self.download_thread = threading.Thread(
-            target=self.download_content, args=(url, download_path)
+            target=self.download_profile, args=(url, download_path, max_videos)
         )
         self.download_thread.start()
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
         self.progress["value"] = 0
         self.progress["mode"] = "determinate"
-        self.file_count.set(0)
+        self.file_count = 0
+        self.total_videos = 0
+        self.profile_name = ""
         self.log_text.delete(1.0, tk.END)
-        self.log_queue.put(("log", f"Starting {scope} download from: {url}\n"))
+        self.log_queue.put(("log", f"Starting TikTok profile download: {url}\n"))
 
     def stop_download(self):
         self.stop_event.set()
@@ -279,63 +339,58 @@ class VideoDownloaderApp(ttk.Window):
                         self.error_logs.append(msg[1].strip())
                 elif msg[0] == "progress":
                     self.progress["value"] = msg[1]
-                elif msg[0] == "inc_count":
-                    self.file_count.set(self.file_count.get() + msg[1])
                 elif msg[0] == "set_max":
                     self.progress["maximum"] = msg[1]
+                    self.total_videos = msg[1]
+                elif msg[0] == "inc_count":
+                    self.file_count += msg[1]
+                elif msg[0] == "profile_info":
+                    self.profile_name = msg[1]
+                elif msg[0] == "update_stats":
+                    stats_text = f"Files: {self.file_count} | Profile: {self.profile_name} | Progress: {self.progress['value']}/{self.total_videos}"
+                    self.stats_label.config(text=stats_text)
                 elif msg[0] == "done":
-                    self.progress.stop()
                     self.start_btn.config(state="normal")
                     self.stop_btn.config(state="disabled")
                     if self.download_thread and self.download_thread.is_alive():
                         self.download_thread.join(timeout=2)
                     self.download_thread = None
-                    self.log_queue.put(("log", "Download process completed.\n"))
+                    final_stats = f"Download completed! Files: {self.file_count} | Profile: {self.profile_name}"
+                    self.stats_label.config(text=final_stats)
+                    self.log_queue.put(
+                        (
+                            "log",
+                            f"\n🎉 Download finished! Successfully downloaded {self.file_count} videos.\n",
+                        )
+                    )
         except queue.Empty:
             pass
         self.after(100, self.process_queue)
 
-    def get_ydl_options(self, url, download_path, scope, download_type):
-        """Configure yt-dlp options based on scope and type"""
-        # Simple output template that works for all cases
-        outtmpl = os.path.join(download_path, "%(title)s.%(ext)s")
-
-        # For playlists/channels, add numbering
-        if scope in ["playlist", "channel"]:
-            outtmpl = os.path.join(
-                download_path, "%(playlist_index|%03d.)%(title)s.%(ext)s"
-            )
+    def get_tiktok_options(self, download_path, download_type, quality, max_videos):
+        """Get TikTok-specific yt-dlp options"""
+        # Base output template with username folder
+        outtmpl = os.path.join(
+            download_path,
+            "%(uploader)s/%(title|%(upload_date)s - %(duration_string)s - %(view_count)s views).%(ext)s",
+        )
 
         base_options = {
             "outtmpl": outtmpl,
             "quiet": True,
             "no_warnings": True,
-            "ignoreerrors": False,  # Stop on errors
-            "continuedl": True,  # Resume partial downloads
+            "ignoreerrors": True,  # Continue on errors for TikTok
+            "continuedl": True,
             "writesubtitles": False,
-            "writeinfojson": False,
-            "writethumbnail": False,
-            "restrictfilenames": True,  # Avoid problematic characters
+            "writeinfojson": True,  # Save metadata
+            "writethumbnail": True,  # Save thumbnails
+            "embed_subs": False,
+            "restrictfilenames": True,
         }
 
-        # Platform-specific settings
-        if "youtube.com" in url.lower() or "youtu.be" in url.lower():
-            base_options["extract_flat"] = False
-        elif "tiktok.com" in url.lower():
-            base_options["extract_flat"] = False
-            # TikTok specific settings
-            base_options["format"] = "best"
-
-        # Scope-specific settings
-        if scope == "single":
-            base_options["noplaylist"] = True
-        else:
-            base_options["noplaylist"] = False
-            base_options["playlistend"] = None  # Download all items
-
-        if scope == "channel":
-            # For channels, extract all videos
-            base_options["playlist_items"] = None
+        # Max videos limit
+        if max_videos != "all":
+            base_options["playlistend"] = max_videos
 
         # Format selection
         if download_type == "audio":
@@ -349,89 +404,109 @@ class VideoDownloaderApp(ttk.Window):
                             "preferredquality": "192",
                         }
                     ],
-                    "audioformat": "mp3",
                     "keepvideo": False,
+                    "outtmpl": os.path.join(
+                        download_path,
+                        "%(uploader)s/%(title|%(upload_date)s - %(duration_string)s - %(view_count)s views).%(ext)s",
+                    ),
                 }
             )
         else:  # video
-            if "tiktok.com" not in url.lower():
+            if quality == "720p":
                 base_options.update(
                     {
-                        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                        "format": "bestvideo[height<=720]+bestaudio/best[height<=720]",
                         "merge_output_format": "mp4",
                     }
                 )
             else:
-                # TikTok videos are usually smaller, use best available
                 base_options.update(
                     {
-                        "format": "best[ext=mp4]/best",
+                        "format": "bestvideo+bestaudio/best",
+                        "merge_output_format": "mp4",
                     }
                 )
 
+        # TikTok specific settings
+        base_options.update(
+            {
+                "extract_flat": False,
+                "playliststart": 1,
+                "noplaylist": False,  # We want the full profile playlist
+            }
+        )
+
         return base_options
 
-    def download_content(self, url, download_path):
-        """Main download function with proper error handling"""
-        scope = self.download_scope.get()
+    def download_profile(self, url, download_path, max_videos):
+        """Download entire TikTok profile"""
         download_type = self.download_type.get()
+        quality = self.quality_var.get()
 
         try:
-            self.log_queue.put(("log", f"Preparing download options for {scope}...\n"))
+            self.log_queue.put(("log", "Preparing TikTok download options...\n"))
 
-            ydl_opts = self.get_ydl_options(url, download_path, scope, download_type)
+            ydl_opts = self.get_tiktok_options(
+                download_path, download_type, quality, max_videos
+            )
             ydl_opts["progress_hooks"] = [self.ydl_hook]
 
-            self.log_queue.put(("log", "Initializing yt-dlp...\n"))
+            self.log_queue.put(("log", "Initializing yt-dlp for TikTok...\n"))
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # First, extract info to get total count
-                self.log_queue.put(("log", "Analyzing content...\n"))
+                # First, analyze the profile
+                self.log_queue.put(("log", "Analyzing TikTok profile...\n"))
 
                 try:
-                    # Try to get info without downloading first
+                    # Extract info without downloading
                     info = ydl.extract_info(url, download=False)
 
-                    # Get total items for progress bar
-                    total_items = 1
-                    if "entries" in info and info["entries"]:
-                        total_items = len(info["entries"])
-                    elif "_type" in info and info["_type"] in ["playlist", "channel"]:
-                        total_items = info.get("playlist_count", 1)
+                    # Get profile info
+                    profile_name = info.get("uploader", "Unknown")
+                    total_videos = info.get("playlist_count", 0)
 
-                    self.log_queue.put(("set_max", max(total_items, 1)))
+                    self.log_queue.put(("profile_info", profile_name))
+                    self.log_queue.put(("set_max", total_videos))
+                    self.log_queue.put(("log", f"Found profile: @{profile_name}\n"))
                     self.log_queue.put(
-                        ("log", f"Found {total_items} item(s) to download\n")
+                        ("log", f"Total videos available: {total_videos}\n")
                     )
+
+                    # Create profile folder
+                    profile_folder = os.path.join(download_path, profile_name)
+                    os.makedirs(profile_folder, exist_ok=True)
+
+                    self.log_queue.put(("update_stats", ""))
 
                 except Exception as analysis_error:
                     self.log_queue.put(
-                        (
-                            "log",
-                            f"Could not analyze content fully, proceeding with download: {str(analysis_error)}\n",
-                        )
+                        ("log", f"Analysis warning: {str(analysis_error)}\n")
                     )
-                    total_items = 1
-                    self.log_queue.put(("set_max", 1))
+                    self.log_queue.put(("set_max", 100))  # Default max
+                    self.log_queue.put(("profile_info", "Unknown"))
+                    total_videos = 100
 
-                # Now download
-                self.log_queue.put(("log", "Starting download process...\n"))
+                # Start downloading
+                self.log_queue.put(("log", "🚀 Starting video downloads...\n"))
                 ydl.download([url])
 
                 self.log_queue.put(
-                    ("log", f"Successfully processed {total_items} item(s)\n")
+                    (
+                        "log",
+                        f"\n✅ Profile download completed for @{self.profile_name}\n",
+                    )
                 )
                 self.log_queue.put(("done",))
 
         except yt_dlp.utils.DownloadCancelled:
-            self.log_queue.put(("log", "Download cancelled by user\n"))
+            self.log_queue.put(("log", "\n⏹️ Download cancelled by user\n"))
         except yt_dlp.utils.DownloadError as e:
-            error_msg = f"Download error: {str(e)}"
-            self.log_queue.put(("log", error_msg + "\n"))
+            error_msg = f"TikTok download error: {str(e)}"
+            self.log_queue.put(("log", f"\n❌ {error_msg}\n"))
             self.error_logs.append(error_msg)
         except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}\n{str(e.__class__.__name__)}"
-            self.log_queue.put(("log", error_msg + "\n"))
+            error_msg = f"Unexpected error: {str(e)}"
+            self.log_queue.put(("log", f"\n❌ {error_msg}\n"))
             self.error_logs.append(error_msg)
         finally:
             self.log_queue.put(("done",))
@@ -443,198 +518,44 @@ class VideoDownloaderApp(ttk.Window):
 
         try:
             if d["status"] == "downloading":
-                # Single file download progress
+                # Get video info
+                title = d.get("title", "Unknown video")[:60]
+                uploader = d.get("uploader", "Unknown")[:20]
+                duration = d.get("duration_string", "Unknown")
+
                 if "_percent_str" in d:
-                    percent_str = d.get("_percent_str", "0%").strip().rstrip("%")
+                    percent_str = d.get("_percent_str", "0%")
                     try:
-                        percent = float(percent_str)
+                        percent = float(percent_str.rstrip("%"))
                         self.log_queue.put(("progress", percent))
                     except (ValueError, TypeError):
                         pass
 
-                # Show download info (but less verbose to avoid spam)
-                title = d.get("title", "Unknown")[:50]  # Truncate long titles
-                if len(title) > 50:
-                    title = title[:47] + "..."
-
-                percent_str = d.get("_percent_str", "0%")
-                self.log_queue.put(("log", f"Downloading: {title} ({percent_str})\n"))
+                # Update progress for current video
+                self.log_queue.put(
+                    ("log", f"⬇️ [{uploader}] {title} ({duration}) - {percent_str}\n")
+                )
 
             elif d["status"] == "finished":
-                # File download completed
-                filename = d.get("filename", "Unknown file")
-                self.log_queue.put(("log", f"✓ Saved: {os.path.basename(filename)}\n"))
-                self.log_queue.put(("inc_count", 1))
+                # File completed
+                filename = d.get("filename", "")
+                if filename:
+                    basename = os.path.basename(filename)
+                    self.log_queue.put(("log", f"✅ Saved: {basename}\n"))
+                    self.log_queue.put(("inc_count", 1))
+                    self.log_queue.put(("update_stats", ""))
 
             elif d["status"] == "error":
                 # Download error
                 error = d.get("error", "Unknown error")
-                title = d.get("title", "Unknown")[:50]
-                self.log_queue.put(
-                    ("log", f"✗ Error downloading '{title}': {error[:100]}...\n")
-                )
-                self.error_logs.append(f"Download error for '{title}': {error}")
+                title = d.get("title", "Unknown video")[:50]
+                self.log_queue.put(("log", f"❌ Failed '{title}': {error[:80]}...\n"))
+                self.error_logs.append(f"Error downloading '{title}': {error}")
 
         except Exception as e:
-            # Don't let progress hook errors crash the download
-            self.log_queue.put(("log", f"Progress update error: {str(e)}\n"))
+            self.log_queue.put(("log", f"⚠️ Progress error: {str(e)}\n"))
 
 
 if __name__ == "__main__":
-    app = VideoDownloaderApp()
+    app = TikTokProfileDownloader()
     app.mainloop()
-
-
-# import tkinter as tk
-# from tkinter import filedialog
-# from tkinter import messagebox
-# import threading
-# import os
-# import yt_dlp
-
-
-# class YouTubeDownloaderApp:
-#     def __init__(self, master):
-#         self.master = master
-#         master.title("YouTube Downloader")
-#         master.geometry("600x300")
-#         master.resizable(False, False)
-
-#         screen_width = master.winfo_screenwidth()
-#         screen_height = master.winfo_screenheight()
-#         center_x = int(screen_width / 2 - 600 / 2)
-#         center_y = int(screen_height / 2 - 300 / 2)
-#         master.geometry(f"600x300+{center_x}+{center_y}")
-
-#         main_frame = tk.Frame(master, padx=20, pady=20)
-#         main_frame.pack(fill="both", expand=True)
-
-#         self.url_label = tk.Label(
-#             main_frame, text="Enter YouTube URL:", font=("Helvetica", 12)
-#         )
-#         self.url_label.pack(pady=(0, 5))
-
-#         self.url_entry = tk.Entry(main_frame, width=50, font=("Helvetica", 12))
-#         self.url_entry.pack(pady=(0, 10))
-
-#         self.type_frame = tk.Frame(main_frame)
-#         self.type_frame.pack(pady=(0, 10))
-
-#         self.download_type = tk.StringVar(value="video")
-
-#         self.video_radio = tk.Radiobutton(
-#             self.type_frame,
-#             text="Download Video",
-#             variable=self.download_type,
-#             value="video",
-#             font=("Helvetica", 10),
-#         )
-#         self.video_radio.pack(side="left", padx=10)
-
-#         self.audio_radio = tk.Radiobutton(
-#             self.type_frame,
-#             text="Download Audio Only",
-#             variable=self.download_type,
-#             value="audio",
-#             font=("Helvetica", 10),
-#         )
-#         self.audio_radio.pack(side="left", padx=10)
-
-#         self.download_button = tk.Button(
-#             main_frame,
-#             text="Download",
-#             command=self.start_download,
-#             font=("Helvetica", 12),
-#             bg="#4CAF50",
-#             fg="white",
-#             relief=tk.RAISED,
-#             bd=3,
-#         )
-#         self.download_button.pack(pady=(0, 10))
-
-#         self.status_label = tk.Label(
-#             main_frame, text="", font=("Helvetica", 10), fg="blue"
-#         )
-#         self.status_label.pack(pady=(5, 0))
-
-#     def start_download(self):
-#         """Starts the download process in a new thread to keep the GUI responsive."""
-#         self.download_button.config(state=tk.DISABLED, text="Downloading...")
-#         self.status_label.config(text="Starting download...")
-
-#         download_thread = threading.Thread(target=self.download_content)
-#         download_thread.start()
-
-#     def download_content(self):
-#         """Handles downloading using yt-dlp."""
-#         url = self.url_entry.get()
-#         if not url:
-#             messagebox.showerror("Error", "Please enter a YouTube URL.")
-#             self.reset_ui()
-#             return
-
-#         try:
-#             download_path = filedialog.askdirectory(initialdir=os.path.expanduser("~"))
-#             if not download_path:
-#                 self.status_label.config(text="Download canceled.")
-#                 self.reset_ui()
-#                 return
-
-#             download_choice = self.download_type.get()
-
-#             self.status_label.config(text="Fetching info...")
-
-#             ydl_opts = {
-#                 "outtmpl": os.path.join(download_path, "%(title)s.%(ext)s"),
-#                 "quiet": True,
-#                 "progress_hooks": [self.ydl_hook],
-#             }
-
-#             if download_choice == "audio":
-#                 ydl_opts.update(
-#                     {
-#                         "format": "bestaudio/best",
-#                         "postprocessors": [
-#                             {
-#                                 "key": "FFmpegExtractAudio",
-#                                 "preferredcodec": "mp3",
-#                                 "preferredquality": "192",
-#                             }
-#                         ],
-#                     }
-#                 )
-#             else:  # video
-#                 ydl_opts.update(
-#                     {
-#                         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-#                         "merge_output_format": "mp4",
-#                     }
-#                 )
-
-#             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-#                 info_dict = ydl.extract_info(url, download=True)
-#                 title = info_dict.get("title", "Video")
-#                 self.status_label.config(text=f"Download complete: {title}")
-#                 messagebox.showinfo("Success", f"'{title}' downloaded successfully!")
-
-#         except Exception as e:
-#             messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
-#             self.status_label.config(text="Download failed.")
-#         finally:
-#             self.reset_ui()
-
-#     def ydl_hook(self, d):
-#         if d["status"] == "downloading":
-#             percent = d.get("_percent_str", "").strip()
-#             self.status_label.config(text=f"Downloading... {percent}")
-#         elif d["status"] == "finished":
-#             self.status_label.config(text="Download finished, finalizing...")
-
-#     def reset_ui(self):
-#         self.download_button.config(state=tk.NORMAL, text="Download")
-
-
-# if __name__ == "__main__":
-#     root = tk.Tk()
-#     app = YouTubeDownloaderApp(root)
-#     root.mainloop()

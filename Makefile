@@ -11,7 +11,7 @@ i:
 	pip install -r requirements.txt
 
 dev:
-	python main.py
+	python pyscrape.py
 
 py:
 	. venv/bin/activate.fish; exec fish

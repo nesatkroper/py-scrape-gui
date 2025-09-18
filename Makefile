@@ -13,7 +13,10 @@ i:
 sc:
 	python pyscrape.py
 
-tu:
+tb:
+	python pytube.py
+
+tk:
 	python pytube.py
 
 py:

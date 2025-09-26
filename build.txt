@@ -1,0 +1,31 @@
+#!/bin/bash
+
+
+#Ubuntu
+pip install pyinstaller
+
+pyinstaller --onefile --windowed pyscrape.py
+
+mkdir -p pyscrape_deb/DEBIAN
+mkdir -p pyscrape_deb/usr/local/bin
+
+cp dist/pyscrape pyscrape_deb/usr/local/bin/
+nano pyscrape_deb/DEBIAN/control
+
+
+Package: pyscrape
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Your Name <you@example.com>
+Description: PyScrape Python GUI App
+
+dpkg-deb --build pyscrape_deb
+
+
+#MacOS
+pyinstaller --onefile --windowed pyscrape.py
+
+hdiutil create -volname PyScrape -srcfolder dist/pyscrape.app -ov -format UDZO PyScrape.dmg
+

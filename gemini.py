@@ -1,734 +1,269 @@
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import ttk, messagebox
+from PIL import Image, ImageTk
 import requests
+from io import BytesIO
 from bs4 import BeautifulSoup
-import os
-import threading
-import json
-import csv
-from urllib.parse import urljoin, urlparse
 
 
-class ScrapingThread(threading.Thread):
-    """A thread to handle the web scraping logic."""
+class ImagePreviewer:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Safe Image Previewer")
+        self.root.geometry("800x600")
 
-    def __init__(self, app, url, options, save_path):
-        super().__init__()
-        self.app = app
-        self.url = url
-        self.options = options
-        self.save_path = save_path
-        self._stop_event = threading.Event()
-        self.scraped_urls = set()
-        self.file_count = 0
+        # URL input
+        self.url_label = tk.Label(root, text="Website URL:")
+        self.url_label.pack(pady=5)
+        self.url_entry = tk.Entry(root, width=60)
+        self.url_entry.pack(pady=5)
 
-    def run(self):
-        """Main scraping loop."""
-        self.app.log("Starting scraping process...")
-        self.scrape(self.url)
-        self.app.log("Scraping finished.")
-        self.app.update_progress(100)
-        self.app.stop_button.config(state=tk.DISABLED)
-        self.app.start_button.config(state=tk.NORMAL)
+        # Fetch button
+        self.fetch_btn = tk.Button(
+            root, text="Preview Images", command=self.fetch_images
+        )
+        self.fetch_btn.pack(pady=5)
 
-    def stop(self):
-        """Stops the scraping process."""
-        self._stop_event.set()
+        # Scrollable canvas for images
+        self.canvas = tk.Canvas(root)
+        self.scrollbar = ttk.Scrollbar(
+            root, orient="vertical", command=self.canvas.yview
+        )
+        self.scrollable_frame = ttk.Frame(self.canvas)
 
-    def is_stopped(self):
-        """Checks if the thread is stopped."""
-        return self._stop_event.is_set()
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
+        )
 
-    def scrape(self, url):
-        """Performs the scraping for a single URL."""
-        if self.is_stopped() or url in self.scraped_urls:
-            return
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
-        self.scraped_urls.add(url)
-        self.app.log(f"Scraping: {url}")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
 
+        self.images = []
+
+    def fetch_images(self):
+        url = self.url_entry.get().strip()
+        if not url.startswith("http"):
+            url = "https://" + url
         try:
             response = requests.get(url, timeout=10)
-            response.raise_for_status()  # Raise HTTPError for bad responses
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            # Create a folder for the domain if it doesn't exist
-            domain_name = urlparse(url).netloc
-            domain_folder = os.path.join(self.save_path, domain_name)
-            os.makedirs(domain_folder, exist_ok=True)
-
-            # Process content based on options
-            data = {}
-            if self.options["save_raw_html"]:
-                with open(
-                    os.path.join(domain_folder, "raw_html.html"), "w", encoding="utf-8"
-                ) as f:
-                    f.write(response.text)
-                self.file_count += 1
-
-            if self.options["extract_metadata"]:
-                data["title"] = soup.title.string if soup.title else "No Title"
-                data["description"] = (
-                    soup.find("meta", attrs={"name": "description"})["content"]
-                    if soup.find("meta", attrs={"name": "description"})
-                    else "No Description"
-                )
-                data["keywords"] = (
-                    soup.find("meta", attrs={"name": "keywords"})["content"]
-                    if soup.find("meta", attrs={"name": "keywords"})
-                    else "No Keywords"
-                )
-                self.app.log(f"Extracted metadata: {data['title']}")
-
-            if self.options["extract_text_content"]:
-                text_content = " ".join(p.text for p in soup.find_all("p"))
-                data["text_content"] = text_content[:500] + "..."  # Truncate for log
-                self.app.log(f"Extracted text content.")
-
-            if self.options["download_images"]:
-                images_folder = os.path.join(domain_folder, "images")
-                os.makedirs(images_folder, exist_ok=True)
-                for img in soup.find_all("img"):
-                    img_url = urljoin(url, img.get("src"))
-                    if img_url:
-                        try:
-                            img_response = requests.get(img_url, timeout=10)
-                            img_name = os.path.basename(urlparse(img_url).path)
-                            if not img_name:
-                                img_name = "image.jpg"
-                            with open(os.path.join(images_folder, img_name), "wb") as f:
-                                f.write(img_response.content)
-                            self.file_count += 1
-                            self.app.log(f"Downloaded image: {img_name}")
-                        except requests.exceptions.RequestException as e:
-                            self.app.log(
-                                f"Error downloading image {img_url}: {e}", "error"
-                            )
-
-            if self.options["download_videos"]:
-                videos_folder = os.path.join(domain_folder, "videos")
-                os.makedirs(videos_folder, exist_ok=True)
-                for video in soup.find_all("video"):
-                    # Check direct src on video tag
-                    src = video.get("src")
-                    if src:
-                        video_url = urljoin(url, src)
-                        try:
-                            vid_response = requests.get(video_url, timeout=10)
-                            vid_name = (
-                                os.path.basename(urlparse(video_url).path)
-                                or "video.mp4"
-                            )
-                            with open(os.path.join(videos_folder, vid_name), "wb") as f:
-                                f.write(vid_response.content)
-                            self.file_count += 1
-                            self.app.log(f"Downloaded video: {vid_name}")
-                        except requests.exceptions.RequestException as e:
-                            self.app.log(
-                                f"Error downloading video {video_url}: {e}", "error"
-                            )
-                    # Also check <source> tags inside <video>
-                    for source in video.find_all("source"):
-                        src = source.get("src")
-                        if src:
-                            video_url = urljoin(url, src)
-                            try:
-                                vid_response = requests.get(video_url, timeout=10)
-                                vid_name = (
-                                    os.path.basename(urlparse(video_url).path)
-                                    or "video.mp4"
-                                )
-                                with open(
-                                    os.path.join(videos_folder, vid_name), "wb"
-                                ) as f:
-                                    f.write(vid_response.content)
-                                self.file_count += 1
-                                self.app.log(f"Downloaded video: {vid_name}")
-                            except requests.exceptions.RequestException as e:
-                                self.app.log(
-                                    f"Error downloading video {video_url}: {e}", "error"
-                                )
-
-            if self.options["extract_all_urls"]:
-                urls = {"internal": [], "external": []}
-                for a_tag in soup.find_all("a", href=True):
-                    href = a_tag["href"]
-                    full_url = urljoin(url, href)
-                    if urlparse(full_url).netloc == domain_name:
-                        urls["internal"].append(full_url)
-                    else:
-                        urls["external"].append(full_url)
-                data["urls"] = urls
-                self.app.log(
-                    f"Found {len(urls['internal'])} internal and {len(urls['external'])} external links."
-                )
-
-            # Save data based on format options
-            if data and self.options["save_as_json"]:
-                with open(
-                    os.path.join(domain_folder, "data.json"), "w", encoding="utf-8"
-                ) as f:
-                    json.dump(data, f, indent=4)
-                self.file_count += 1
-
-            if data and self.options["save_as_csv"]:
-                with open(
-                    os.path.join(domain_folder, "data.csv"),
-                    "w",
-                    newline="",
-                    encoding="utf-8",
-                ) as f:
-                    writer = csv.DictWriter(f, fieldnames=data.keys())
-                    writer.writeheader()
-                    writer.writerow(data)
-                self.file_count += 1
-
-            # Update GUI
-            self.app.file_count_var.set(f"Files downloaded: {self.file_count}")
-            self.app.update_progress(len(self.scraped_urls))
-
-            # Recursive scraping
-            if (
-                self.options["follow_internal_links"]
-                or self.options["follow_external_links"]
-            ):
-                links_to_follow = []
-                if self.options["follow_internal_links"] and "urls" in data:
-                    links_to_follow.extend(data["urls"]["internal"])
-                if self.options["follow_external_links"] and "urls" in data:
-                    links_to_follow.extend(data["urls"]["external"])
-
-                for link in links_to_follow:
-                    self.scrape(link)
-                    if self.is_stopped():
-                        break
-
-        except requests.exceptions.HTTPError as e:
-            self.app.log(f"HTTP Error: {e}", "error")
-        except requests.exceptions.RequestException as e:
-            self.app.log(f"Connection Error: {e}", "error")
+            response.raise_for_status()
         except Exception as e:
-            self.app.log(f"An unexpected error occurred: {e}", "error")
-
-
-class ScraperApp(tk.Tk):
-    """The main GUI application."""
-
-    def __init__(self):
-        super().__init__()
-        self.title("Web Scraper GUI")
-        self.geometry("600x600")
-        self.resizable(True, True)  # Explicitly make the window resizable
-        self.scraper_thread = None
-        self.create_widgets()
-
-    def create_widgets(self):
-        """Creates all GUI widgets."""
-        # Main Frame
-        main_frame = ttk.LabelFrame(self, text="Web Scraper Settings", padding=(20, 10))
-        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
-
-        # Configure main_frame to expand
-        main_frame.grid_rowconfigure(9, weight=1)
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(
-            1, weight=0
-        )  # Column 1 doesn't need to expand much
-
-        # URL Input
-        ttk.Label(main_frame, text="Enter URL to scrape:").grid(
-            row=0, column=0, sticky="w", pady=(0, 5)
-        )
-        self.url_entry = ttk.Entry(main_frame, width=60)
-        self.url_entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
-
-        # Save Location
-        ttk.Label(main_frame, text="Save location:").grid(
-            row=2, column=0, sticky="w", pady=(0, 5)
-        )
-        self.save_path_var = tk.StringVar()
-        self.save_path_entry = ttk.Entry(
-            main_frame, textvariable=self.save_path_var, state="readonly", width=50
-        )
-        self.save_path_entry.grid(row=3, column=0, sticky="ew", pady=(0, 10))
-        self.browse_button = ttk.Button(
-            main_frame, text="Browse", command=self.browse_for_folder
-        )
-        self.browse_button.grid(row=3, column=1, padx=(5, 0), sticky="e")
-
-        # Options Frame with Scrollbar for responsiveness
-        options_outer_frame = ttk.Frame(main_frame)
-        options_outer_frame.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=10)
-        options_outer_frame.grid_rowconfigure(0, weight=1)
-        options_outer_frame.grid_columnconfigure(0, weight=1)
-
-        canvas = tk.Canvas(options_outer_frame)
-        canvas.grid(row=0, column=0, sticky="nsew")
-
-        scrollbar = ttk.Scrollbar(
-            options_outer_frame, orient="vertical", command=canvas.yview
-        )
-        scrollbar.grid(row=0, column=1, sticky="ns")
-
-        options_frame = ttk.LabelFrame(canvas, text="Scraping Options", padding=5)
-        options_frame.bind(
-            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=options_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # Options grid configuration for expansion
-        options_frame.grid_columnconfigure(0, weight=1)
-
-        self.options_vars = {}
-        options = [
-            ("Extract all URLs from <a> tags", "extract_all_urls"),
-            ("Download all images (full resolution)", "download_images"),
-            ("Download videos (if present)", "download_videos"),  # New option added
-            ("Extract text content", "extract_text_content"),
-            ("Extract metadata (title, description, keywords)", "extract_metadata"),
-            ("Follow internal links (recursive)", "follow_internal_links"),
-            ("Follow external links", "follow_external_links"),
-            ("Save as JSON", "save_as_json"),
-            ("Save as CSV", "save_as_csv"),
-            ("Save raw HTML", "save_raw_html"),
-        ]
-        for i, (text, var_name) in enumerate(options):
-            self.options_vars[var_name] = tk.BooleanVar(value=False)
-            chk = ttk.Checkbutton(
-                options_frame, text=text, variable=self.options_vars[var_name]
-            )
-            chk.grid(row=i, column=0, sticky="w")
-            options_frame.grid_rowconfigure(
-                i, weight=1
-            )  # Allow rows to space out if resized
-
-        # Buttons and Status
-        button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=5, column=0, columnspan=2, pady=10, sticky="ew")
-        button_frame.grid_columnconfigure(0, weight=1)
-        self.start_button = ttk.Button(
-            button_frame, text="Start Scraping", command=self.start_scraping
-        )
-        self.start_button.pack(side="left", padx=5)
-        self.stop_button = ttk.Button(
-            button_frame,
-            text="Stop Scraping",
-            command=self.stop_scraping,
-            state=tk.DISABLED,
-        )
-        self.stop_button.pack(side="left", padx=5)
-
-        # Progress Bar
-        self.progress_bar = ttk.Progressbar(
-            main_frame, orient="horizontal", mode="indeterminate"
-        )
-        self.progress_bar.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(0, 5))
-
-        # File Counter
-        self.file_count_var = tk.StringVar(value="Files downloaded: 0")
-        ttk.Label(main_frame, textvariable=self.file_count_var).grid(
-            row=7, column=0, columnspan=2, sticky="w"
-        )
-
-        # Log Area
-        ttk.Label(main_frame, text="Scraping Log:").grid(
-            row=8, column=0, sticky="w", pady=(10, 5)
-        )
-        self.log_text = tk.Text(main_frame, height=10, state="disabled", wrap="word")
-        self.log_text.grid(row=9, column=0, columnspan=2, sticky="nsew")
-
-    def log(self, message, message_type="info"):
-        """Appends a message to the log area."""
-        self.log_text.config(state="normal")
-        if message_type == "error":
-            self.log_text.insert("end", f"[ERROR] {message}\n", "error")
-        else:
-            self.log_text.insert("end", f"[INFO] {message}\n")
-        self.log_text.see("end")
-        self.log_text.config(state="disabled")
-
-    def update_progress(self, value):
-        """Updates the progress bar."""
-        if value < 100:
-            self.progress_bar.config(mode="indeterminate")
-            self.progress_bar.start()
-        else:
-            self.progress_bar.config(mode="determinate", value=value)
-            self.progress_bar.stop()
-
-    def browse_for_folder(self):
-        """Opens a file dialog to select a save location."""
-        folder = filedialog.askdirectory()
-        if folder:
-            self.save_path_var.set(folder)
-
-    def start_scraping(self):
-        """Starts the scraping thread."""
-        url = self.url_entry.get().strip()
-        save_path = self.save_path_var.get().strip()
-
-        if not url:
-            self.log("Please enter a URL.", "error")
-            return
-        if not save_path:
-            self.log("Please choose a save location.", "error")
+            messagebox.showerror("Error", f"Failed to fetch URL:\n{e}")
             return
 
-        # Ensure the save_path exists
-        os.makedirs(save_path, exist_ok=True)
+        soup = BeautifulSoup(response.text, "html.parser")
+        img_tags = soup.find_all("img")
+        if not img_tags:
+            messagebox.showinfo("Info", "No images found on this page.")
+            return
 
-        options = {var: self.options_vars[var].get() for var in self.options_vars}
+        # Clear previous images
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+        self.images = []
 
-        self.start_button.config(state=tk.DISABLED)
-        self.stop_button.config(state=tk.NORMAL)
-        self.update_progress(0)
-        self.log_text.delete(1.0, tk.END)
-        self.file_count_var.set("Files downloaded: 0")
-
-        # Start the scraping in a new thread
-        self.scraper_thread = ScrapingThread(self, url, options, save_path)
-        self.scraper_thread.start()
-
-    def stop_scraping(self):
-        """Stops the scraping thread."""
-        if self.scraper_thread and self.scraper_thread.is_alive():
-            self.scraper_thread.stop()
-            self.log("Stopping scraping...")
-            self.progress_bar.stop()
-            self.stop_button.config(state=tk.DISABLED)
-            self.start_button.config(state=tk.NORMAL)
+        for idx, img in enumerate(img_tags):
+            src = img.get("src")
+            if not src:
+                continue
+            if src.startswith("//"):
+                src = "https:" + src
+            elif src.startswith("/"):
+                src = url.rstrip("/") + src
+            try:
+                img_response = requests.get(src, timeout=10)
+                img_response.raise_for_status()
+                pil_img = Image.open(BytesIO(img_response.content))
+                pil_img.thumbnail((200, 200))
+                tk_img = ImageTk.PhotoImage(pil_img)
+                self.images.append(tk_img)
+                label = tk.Label(self.scrollable_frame, image=tk_img)
+                label.grid(row=idx // 3, column=idx % 3, padx=5, pady=5)
+            except Exception as e:
+                print(f"Skipping image {src}: {e}")
 
 
 if __name__ == "__main__":
-    app = ScraperApp()
-    app.mainloop()
+    root = tk.Tk()
+    app = ImagePreviewer(root)
+    root.mainloop()
 
 
-# import tkinter as tk
-# from tkinter import filedialog, ttk
-# import requests
-# from bs4 import BeautifulSoup
 # import os
-# import threading
 # import json
-# import csv
-# from urllib.parse import urljoin, urlparse
+# import requests
+# from urllib.parse import urlparse, urljoin
+# from bs4 import BeautifulSoup
+# import tkinter as tk
+# from tkinter import ttk, filedialog, messagebox
+# import threading
+# from openpyxl import Workbook
 
 
-# class ScrapingThread(threading.Thread):
-#     """A thread to handle the web scraping logic."""
-
-#     def __init__(self, app, url, options, save_path):
-#         super().__init__()
-#         self.app = app
-#         self.url = url
-#         self.options = options
-#         self.save_path = save_path
-#         self._stop_event = threading.Event()
-#         self.scraped_urls = set()
-#         self.file_count = 0
-
-#     def run(self):
-#         """Main scraping loop."""
-#         self.app.log("Starting scraping process...")
-#         self.scrape(self.url)
-#         self.app.log("Scraping finished.")
-#         self.app.update_progress(100)
-#         self.app.stop_button.config(state=tk.DISABLED)
-#         self.app.start_button.config(state=tk.NORMAL)
-
-#     def stop(self):
-#         """Stops the scraping process."""
-#         self._stop_event.set()
-
-#     def is_stopped(self):
-#         """Checks if the thread is stopped."""
-#         return self._stop_event.is_set()
-
-#     def scrape(self, url):
-#         """Performs the scraping for a single URL."""
-#         if self.is_stopped() or url in self.scraped_urls:
-#             return
-
-#         self.scraped_urls.add(url)
-#         self.app.log(f"Scraping: {url}")
-
-#         try:
-#             response = requests.get(url, timeout=10)
-#             response.raise_for_status()  # Raise HTTPError for bad responses
-#             soup = BeautifulSoup(response.text, "html.parser")
-
-#             # Create a folder for the domain if it doesn't exist
-#             domain_name = urlparse(url).netloc
-#             domain_folder = os.path.join(self.save_path, domain_name)
-#             os.makedirs(domain_folder, exist_ok=True)
-
-#             # Process content based on options
-#             data = {}
-#             if self.options["save_raw_html"]:
-#                 with open(
-#                     os.path.join(domain_folder, "raw_html.html"), "w", encoding="utf-8"
-#                 ) as f:
-#                     f.write(response.text)
-#                 self.file_count += 1
-
-#             if self.options["extract_metadata"]:
-#                 data["title"] = soup.title.string if soup.title else "No Title"
-#                 data["description"] = (
-#                     soup.find("meta", attrs={"name": "description"})["content"]
-#                     if soup.find("meta", attrs={"name": "description"})
-#                     else "No Description"
-#                 )
-#                 data["keywords"] = (
-#                     soup.find("meta", attrs={"name": "keywords"})["content"]
-#                     if soup.find("meta", attrs={"name": "keywords"})
-#                     else "No Keywords"
-#                 )
-#                 self.app.log(f"Extracted metadata: {data['title']}")
-
-#             if self.options["extract_text_content"]:
-#                 text_content = " ".join(p.text for p in soup.find_all("p"))
-#                 data["text_content"] = text_content[:500] + "..."  # Truncate for log
-#                 self.app.log(f"Extracted text content.")
-
-#             if self.options["download_images"]:
-#                 images_folder = os.path.join(domain_folder, "images")
-#                 os.makedirs(images_folder, exist_ok=True)
-#                 for img in soup.find_all("img"):
-#                     img_url = urljoin(url, img.get("src"))
-#                     if img_url:
-#                         try:
-#                             img_response = requests.get(img_url, timeout=10)
-#                             img_name = os.path.basename(urlparse(img_url).path)
-#                             if not img_name:
-#                                 img_name = "image.jpg"
-#                             with open(os.path.join(images_folder, img_name), "wb") as f:
-#                                 f.write(img_response.content)
-#                             self.file_count += 1
-#                             self.app.log(f"Downloaded image: {img_name}")
-#                         except requests.exceptions.RequestException as e:
-#                             self.app.log(
-#                                 f"Error downloading image {img_url}: {e}", "error"
-#                             )
-
-#             if self.options["extract_all_urls"]:
-#                 urls = {"internal": [], "external": []}
-#                 for a_tag in soup.find_all("a", href=True):
-#                     href = a_tag["href"]
-#                     full_url = urljoin(url, href)
-#                     if urlparse(full_url).netloc == domain_name:
-#                         urls["internal"].append(full_url)
-#                     else:
-#                         urls["external"].append(full_url)
-#                 data["urls"] = urls
-#                 self.app.log(
-#                     f"Found {len(urls['internal'])} internal and {len(urls['external'])} external links."
-#                 )
-
-#             # Save data based on format options
-#             if data and self.options["save_as_json"]:
-#                 with open(
-#                     os.path.join(domain_folder, "data.json"), "w", encoding="utf-8"
-#                 ) as f:
-#                     json.dump(data, f, indent=4)
-#                 self.file_count += 1
-
-#             if data and self.options["save_as_csv"]:
-#                 with open(
-#                     os.path.join(domain_folder, "data.csv"),
-#                     "w",
-#                     newline="",
-#                     encoding="utf-8",
-#                 ) as f:
-#                     writer = csv.DictWriter(f, fieldnames=data.keys())
-#                     writer.writeheader()
-#                     writer.writerow(data)
-#                 self.file_count += 1
-
-#             # Update GUI
-#             self.app.file_count_var.set(f"Files downloaded: {self.file_count}")
-#             self.app.update_progress(len(self.scraped_urls))
-
-#             # Recursive scraping
-#             if (
-#                 self.options["follow_internal_links"]
-#                 or self.options["follow_external_links"]
-#             ):
-#                 links_to_follow = []
-#                 if self.options["follow_internal_links"] and "urls" in data:
-#                     links_to_follow.extend(data["urls"]["internal"])
-#                 if self.options["follow_external_links"] and "urls" in data:
-#                     links_to_follow.extend(data["urls"]["external"])
-
-#                 for link in links_to_follow:
-#                     self.scrape(link)
-#                     if self.is_stopped():
-#                         break
-
-#         except requests.exceptions.HTTPError as e:
-#             self.app.log(f"HTTP Error: {e}", "error")
-#         except requests.exceptions.RequestException as e:
-#             self.app.log(f"Connection Error: {e}", "error")
-#         except Exception as e:
-#             self.app.log(f"An unexpected error occurred: {e}", "error")
+# # ---------- Helper Functions ----------
+# def sanitize_filename(name):
+#     return "".join(c for c in name if c.isalnum() or c in "._-")
 
 
-# class ScraperApp(tk.Tk):
-#     """The main GUI application."""
+# def download_media(url, folder, log_panel):
+#     try:
+#         if url.startswith("//"):
+#             url = "https:" + url
+#         r = requests.get(url, stream=True, timeout=15)
+#         r.raise_for_status()
+#         filename = os.path.join(folder, sanitize_filename(url.split("/")[-1]))
+#         with open(filename, "wb") as f:
+#             for chunk in r.iter_content(1024):
+#                 f.write(chunk)
+#         log_panel.insert(tk.END, f"Downloaded: {url}")
+#         log_panel.yview(tk.END)
+#         return filename
+#     except Exception as e:
+#         log_panel.insert(tk.END, f"Error downloading {url}: {e}")
+#         log_panel.yview(tk.END)
+#         return None
 
-#     def __init__(self):
-#         super().__init__()
-#         self.title("Web Scraper GUI")
-#         self.geometry("600x600")
-#         self.scraper_thread = None
-#         self.create_widgets()
 
-#     def create_widgets(self):
-#         """Creates all GUI widgets."""
-#         # Main Frame
-#         main_frame = ttk.LabelFrame(self, text="Web Scraper Settings", padding=(20, 10))
-#         main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+# def scrape_website(
+#     url, output_dir, log_panel, progress_var, export_json=True, export_excel=True
+# ):
+#     try:
+#         r = requests.get(url, timeout=15)
+#         r.raise_for_status()
+#     except Exception as e:
+#         messagebox.showerror("Error", f"Failed to fetch URL: {e}")
+#         return
 
-#         # URL Input
-#         ttk.Label(main_frame, text="Enter URL to scrape:").grid(
-#             row=0, column=0, sticky="w", pady=(0, 5)
-#         )
-#         self.url_entry = ttk.Entry(main_frame, width=60)
-#         self.url_entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+#     soup = BeautifulSoup(r.text, "html.parser")
+#     domain = urlparse(url).netloc
+#     domain_folder = os.path.join(output_dir, sanitize_filename(domain))
+#     os.makedirs(domain_folder, exist_ok=True)
 
-#         # Save Location
-#         ttk.Label(main_frame, text="Save location:").grid(
-#             row=2, column=0, sticky="w", pady=(0, 5)
-#         )
-#         self.save_path_var = tk.StringVar()
-#         self.save_path_entry = ttk.Entry(
-#             main_frame, textvariable=self.save_path_var, state="readonly", width=50
-#         )
-#         self.save_path_entry.grid(row=3, column=0, sticky="ew", pady=(0, 10))
-#         self.browse_button = ttk.Button(
-#             main_frame, text="Browse", command=self.browse_for_folder
-#         )
-#         self.browse_button.grid(row=3, column=1, padx=(5, 0), sticky="e")
+#     # Collect images and videos
+#     media_urls = set()
+#     for img in soup.find_all("img"):
+#         src = img.get("src") or img.get("data-src")
+#         if src:
+#             media_urls.add(urljoin(url, src))
+#         srcset = img.get("srcset")
+#         if srcset:
+#             largest = srcset.split(",")[-1].split()[0]
+#             media_urls.add(urljoin(url, largest))
+#     for video in soup.find_all("video"):
+#         src = video.get("src")
+#         if src:
+#             media_urls.add(urljoin(url, src))
+#         for source in video.find_all("source"):
+#             src = source.get("src")
+#             if src:
+#                 media_urls.add(urljoin(url, src))
 
-#         # Result Name (Optional) - Not implemented as per requirement, domain name is used
-#         # Checkboxes for scraping options
-#         options_frame = ttk.LabelFrame(main_frame, text="Scraping Options", padding=5)
-#         options_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=10)
-#         self.options_vars = {}
-#         options = [
-#             ("Extract all URLs from <a> tags", "extract_all_urls"),
-#             ("Download all images (full resolution)", "download_images"),
-#             ("Extract text content", "extract_text_content"),
-#             ("Extract metadata (title, description, keywords)", "extract_metadata"),
-#             ("Follow internal links (recursive)", "follow_internal_links"),
-#             ("Follow external links", "follow_external_links"),
-#             ("Save as JSON", "save_as_json"),
-#             ("Save as CSV", "save_as_csv"),
-#             ("Save raw HTML", "save_raw_html"),
-#         ]
-#         for i, (text, var_name) in enumerate(options):
-#             self.options_vars[var_name] = tk.BooleanVar(value=False)
-#             ttk.Checkbutton(
-#                 options_frame, text=text, variable=self.options_vars[var_name]
-#             ).grid(row=i, column=0, sticky="w")
+#     results = []
+#     total = len(media_urls)
+#     progress_step = 100 / max(total, 1)
 
-#         # Buttons and Status
-#         button_frame = ttk.Frame(main_frame)
-#         button_frame.grid(row=5, column=0, columnspan=2, pady=10)
-#         self.start_button = ttk.Button(
-#             button_frame, text="Start Scraping", command=self.start_scraping
-#         )
-#         self.start_button.pack(side="left", padx=5)
-#         self.stop_button = ttk.Button(
-#             button_frame,
-#             text="Stop Scraping",
-#             command=self.stop_scraping,
-#             state=tk.DISABLED,
-#         )
-#         self.stop_button.pack(side="left", padx=5)
+#     for i, m_url in enumerate(media_urls, 1):
+#         filename = download_media(m_url, domain_folder, log_panel)
+#         if filename:
+#             results.append({"url": m_url, "file": filename})
+#         progress_var.set(i * progress_step)
 
-#         # Progress Bar
-#         self.progress_bar = ttk.Progressbar(
-#             main_frame, orient="horizontal", mode="indeterminate"
-#         )
-#         self.progress_bar.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+#     # Save JSON
+#     if export_json:
+#         json_path = os.path.join(domain_folder, "scraped.json")
+#         with open(json_path, "w", encoding="utf-8") as f:
+#             json.dump(results, f, ensure_ascii=False, indent=2)
 
-#         # File Counter
-#         self.file_count_var = tk.StringVar(value="Files downloaded: 0")
-#         ttk.Label(main_frame, textvariable=self.file_count_var).grid(
-#             row=7, column=0, columnspan=2, sticky="w"
+#     # Save Excel
+#     if export_excel:
+#         wb = Workbook()
+#         ws = wb.active
+#         ws.append(["URL", "Saved File"])
+#         for item in results:
+#             ws.append([item["url"], item["file"]])
+#         excel_path = os.path.join(domain_folder, "scraped.xlsx")
+#         wb.save(excel_path)
+
+#     log_panel.insert(
+#         tk.END, f"Scraping complete! {len(results)} items saved in {domain_folder}"
+#     )
+#     log_panel.yview(tk.END)
+#     progress_var.set(0)
+
+
+# # ---------- GUI ----------
+# class ScraperGUI:
+#     def __init__(self, root):
+#         self.root = root
+#         root.title("Python Web Scraper")
+
+#         # URL input
+#         tk.Label(root, text="Website URL:").grid(row=0, column=0, sticky="w")
+#         self.url_entry = tk.Entry(root, width=60)
+#         self.url_entry.grid(row=0, column=1, columnspan=2, pady=5, sticky="w")
+
+#         # Output directory
+#         tk.Label(root, text="Output Folder:").grid(row=1, column=0, sticky="w")
+#         self.output_entry = tk.Entry(root, width=50)
+#         self.output_entry.grid(row=1, column=1, pady=5, sticky="w")
+#         tk.Button(root, text="Browse", command=self.browse_folder).grid(
+#             row=1, column=2, padx=5
 #         )
 
-#         # Log Area
-#         ttk.Label(main_frame, text="Scraping Log:").grid(
-#             row=8, column=0, sticky="w", pady=(10, 5)
+#         # Start button
+#         self.start_btn = tk.Button(
+#             root, text="Start Scraping", command=self.start_scraping
 #         )
-#         self.log_text = tk.Text(main_frame, height=10, state="disabled", wrap="word")
-#         self.log_text.grid(row=9, column=0, columnspan=2, sticky="nsew")
-#         main_frame.grid_rowconfigure(9, weight=1)
-#         main_frame.grid_columnconfigure(0, weight=1)
+#         self.start_btn.grid(row=2, column=1, pady=10)
 
-#     def log(self, message, message_type="info"):
-#         """Appends a message to the log area."""
-#         self.log_text.config(state="normal")
-#         if message_type == "error":
-#             self.log_text.insert("end", f"[ERROR] {message}\n", "error")
-#         else:
-#             self.log_text.insert("end", f"[INFO] {message}\n")
-#         self.log_text.see("end")
-#         self.log_text.config(state="disabled")
+#         # Progress bar
+#         self.progress_var = tk.DoubleVar()
+#         self.progress = ttk.Progressbar(
+#             root, variable=self.progress_var, maximum=100, length=400
+#         )
+#         self.progress.grid(row=3, column=0, columnspan=3, pady=5)
 
-#     def update_progress(self, value):
-#         """Updates the progress bar."""
-#         if value < 100:
-#             self.progress_bar.config(mode="indeterminate")
-#             self.progress_bar.start()
-#         else:
-#             self.progress_bar.config(mode="determinate", value=value)
-#             self.progress_bar.stop()
+#         # Log panel
+#         tk.Label(root, text="Log / Errors:").grid(row=4, column=0, sticky="w")
+#         self.log_panel = tk.Listbox(root, width=80, height=20)
+#         self.log_panel.grid(row=5, column=0, columnspan=3, pady=5)
 
-#     def browse_for_folder(self):
-#         """Opens a file dialog to select a save location."""
+#         # Copy button
+#         tk.Button(root, text="Copy Log", command=self.copy_log).grid(
+#             row=6, column=1, pady=5
+#         )
+
+#     def browse_folder(self):
 #         folder = filedialog.askdirectory()
 #         if folder:
-#             self.save_path_var.set(folder)
+#             self.output_entry.delete(0, tk.END)
+#             self.output_entry.insert(0, folder)
+
+#     def copy_log(self):
+#         self.root.clipboard_clear()
+#         self.root.clipboard_append("\n".join(self.log_panel.get(0, tk.END)))
+#         messagebox.showinfo("Copied", "Log copied to clipboard!")
 
 #     def start_scraping(self):
-#         """Starts the scraping thread."""
 #         url = self.url_entry.get().strip()
-#         save_path = self.save_path_var.get().strip()
-
-#         if not url:
-#             self.log("Please enter a URL.", "error")
+#         output_dir = self.output_entry.get().strip()
+#         if not url or not output_dir:
+#             messagebox.showwarning(
+#                 "Input Required", "Please enter URL and output folder"
+#             )
 #             return
-#         if not save_path:
-#             self.log("Please choose a save location.", "error")
-#             return
-
-#         options = {var: self.options_vars[var].get() for var in self.options_vars}
-
-#         self.start_button.config(state=tk.DISABLED)
-#         self.stop_button.config(state=tk.NORMAL)
-#         self.update_progress(0)
-#         self.log_text.delete(1.0, tk.END)
-#         self.file_count_var.set("Files downloaded: 0")
-
-#         # Start the scraping in a new thread
-#         self.scraper_thread = ScrapingThread(self, url, options, save_path)
-#         self.scraper_thread.start()
-
-#     def stop_scraping(self):
-#         """Stops the scraping thread."""
-#         if self.scraper_thread and self.scraper_thread.is_alive():
-#             self.scraper_thread.stop()
-#             self.log("Stopping scraping...")
-#             self.progress_bar.stop()
-#             self.stop_button.config(state=tk.DISABLED)
-#             self.start_button.config(state=tk.NORMAL)
+#         threading.Thread(
+#             target=scrape_website,
+#             args=(url, output_dir, self.log_panel, self.progress_var),
+#         ).start()
 
 
+# # ---------- Run ----------
 # if __name__ == "__main__":
-#     app = ScraperApp()
-#     app.mainloop()
+#     root = tk.Tk()
+#     app = ScraperGUI(root)
+#     root.mainloop()

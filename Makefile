@@ -10,14 +10,14 @@ clear:
 i: 
 	pip install -r requirements.txt
 
-sc:
+ts:
 	python pyscrape.py
 
 tb:
 	python pytube.py
 
-tk:
-	python pytube.py
+tg:
+	python gemini.py
 
 py:
 	. venv/bin/activate.fish; exec fish

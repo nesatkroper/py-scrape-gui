@@ -1,0 +1,1 @@
+([('app', '/Users/nun/Desktop/Personal/py-scrape-gui/dist/app', 'EXECUTABLE')],)

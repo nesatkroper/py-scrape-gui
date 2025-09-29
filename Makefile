@@ -19,6 +19,9 @@ tb:
 tg:
 	python gemini.py
 
+app:
+	python app/app.py
+
 py:
 	. venv/bin/activate.fish; exec fish
 

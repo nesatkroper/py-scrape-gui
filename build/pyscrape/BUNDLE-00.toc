@@ -1,3 +1,0 @@
-([('pyscrape',
-   '/Users/nun/Desktop/Personal/py-scrape-gui/dist/pyscrape',
-   'EXECUTABLE')],)

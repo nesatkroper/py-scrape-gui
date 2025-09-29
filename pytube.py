@@ -2,238 +2,229 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-import yt_dlp
-import threading
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, urljoin
 import os
+import json
+import csv
+import threading
 import queue
-from urllib.parse import urlparse
-import re
+from datetime import datetime
+import collections
+import pyperclip
 
 
-class TikTokProfileDownloader(ttk.Window):
+class ScraperApp(ttk.Window):
     def __init__(self):
         super().__init__(themename="darkly")
-        self.title("TikTok Profile Downloader")
+        self.title("Web Scraper")
+        # Increased initial size to better accommodate the tabbed design
         self.geometry("700x500")
-        self.download_thread = None
+        self.scraping_thread = None
         self.stop_event = threading.Event()
         self.log_queue = queue.Queue()
         self.error_logs = []
+        # The file count is now an attribute initialized in build_status_tab
+        self.file_count = tk.IntVar(value=0)
         self.after(100, self.process_queue)
-
-        # Default save path
-        default_path = os.path.join(os.path.expanduser("~"), "TikTok_Downloads")
-        if not os.path.exists(default_path):
-            os.makedirs(default_path, exist_ok=True)
-        self.default_save_path = default_path
-
         self.build_ui()
 
     def build_ui(self):
-        main_frame = ttk.Frame(self, padding=20)
+        main_frame = ttk.Frame(self, padding=10)
         main_frame.pack(fill="both", expand=True)
 
-        # Profile URL Frame
-        url_frame = ttk.Frame(main_frame)
+        # 1. Create a Notebook widget for tabs
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.pack(fill="both", expand=True, pady=10)
+
+        # 2. Create the three main tabs (frames)
+        self.setup_tab = ttk.Frame(self.notebook, padding=15)
+        self.options_tab = ttk.Frame(self.notebook, padding=15)
+        self.status_tab = ttk.Frame(self.notebook, padding=15)
+
+        # 3. Add the tabs to the notebook
+        self.notebook.add(self.setup_tab, text="🌐 Setup & Control")
+        self.notebook.add(self.options_tab, text="⚙️ Scraping Options")
+        self.notebook.add(self.status_tab, text="📊 Status & Logs")
+
+        # Build the content for each tab
+        self.build_setup_tab()
+        self.build_options_tab()
+        self.build_status_tab()
+
+    def build_setup_tab(self):
+        # --- URL Frame ---
+        url_frame = ttk.LabelFrame(self.setup_tab, text="Target URL", padding=15)
         url_frame.pack(fill="x", pady=10)
-        ttk.Label(
-            url_frame, text="TikTok Profile URL:", font=("Helvetica", 12, "bold")
-        ).pack(side="left", padx=5)
-        self.url_entry = ttk.Entry(url_frame, width=50, font=("Helvetica", 10))
-        self.url_entry.pack(side="left", fill="x", expand=True, padx=5)
-
-        # Example URL
-        example_label = ttk.Label(
-            main_frame,
-            text="Example: https://www.tiktok.com/@username",
-            font=("Helvetica", 9),
-            foreground="gray",
-        )
-        example_label.pack(anchor="w", pady=(0, 10))
-
-        # Save location frame
-        save_frame = ttk.Frame(main_frame)
-        save_frame.pack(fill="x", pady=10)
-        ttk.Label(save_frame, text="Save location", font=("Helvetica", 12)).pack(
+        ttk.Label(url_frame, text="URL:", font=("Helvetica", 14, "bold")).pack(
             side="left", padx=5
         )
-        self.save_path = tk.StringVar(value=self.default_save_path)
-        path_entry = ttk.Entry(
-            save_frame, textvariable=self.save_path, width=40, font=("Helvetica", 10)
+        self.url_entry = ttk.Entry(url_frame, width=50, font=("Helvetica", 12))
+        self.url_entry.pack(side="left", fill="x", expand=True, padx=10)
+
+        # --- Save Location Frame ---
+        save_frame = ttk.LabelFrame(self.setup_tab, text="Save Location", padding=15)
+        save_frame.pack(fill="x", pady=20)
+        ttk.Label(save_frame, text="Path:", font=("Helvetica", 14, "bold")).pack(
+            side="left", padx=5
         )
-        path_entry.pack(side="left", fill="x", expand=True, padx=5)
+        self.save_path = tk.StringVar(value=os.getcwd())
+        ttk.Entry(
+            save_frame, textvariable=self.save_path, width=40, font=("Helvetica", 12)
+        ).pack(side="left", fill="x", expand=True, padx=10)
         ttk.Button(
-            save_frame, text="Browse", command=self.browse_save, style="primary.TButton"
+            save_frame, text="Browse", command=self.browse_save, bootstyle="primary"
         ).pack(side="left", padx=5)
         ttk.Button(
             save_frame,
             text="New Dir",
             command=self.create_new_dir,
-            style="secondary.TButton",
+            bootstyle="secondary",
         ).pack(side="left", padx=5)
 
-        # Options frame
-        options_frame = ttk.LabelFrame(main_frame, text="Download Options", padding=10)
-        options_frame.pack(fill="x", pady=10)
-
-        # Download type
-        self.download_type = tk.StringVar(value="video")
-        ttk.Radiobutton(
-            options_frame,
-            text="Download Videos (MP4)",
-            variable=self.download_type,
-            value="video",
-            style="info.TRadiobutton",
-        ).pack(anchor="w", pady=2)
-        ttk.Radiobutton(
-            options_frame,
-            text="Download Audio Only (MP3)",
-            variable=self.download_type,
-            value="audio",
-            style="info.TRadiobutton",
-        ).pack(anchor="w", pady=2)
-
-        # Video quality
-        ttk.Separator(options_frame, orient="horizontal").pack(fill="x", pady=10)
-        ttk.Label(
-            options_frame, text="Video Quality:", font=("Helvetica", 10, "bold")
-        ).pack(anchor="w", pady=(0, 5))
-
-        self.quality_var = tk.StringVar(value="best")
-        quality_frame = ttk.Frame(options_frame)
-        quality_frame.pack(fill="x", pady=2)
-
-        ttk.Radiobutton(
-            quality_frame,
-            text="Best Quality",
-            variable=self.quality_var,
-            value="best",
-            style="info.TRadiobutton",
-        ).pack(side="left", padx=10)
-        ttk.Radiobutton(
-            quality_frame,
-            text="720p (Faster)",
-            variable=self.quality_var,
-            value="720p",
-            style="info.TRadiobutton",
-        ).pack(side="left", padx=10)
-
-        # Max videos
-        ttk.Separator(options_frame, orient="horizontal").pack(fill="x", pady=10)
-        ttk.Label(
-            options_frame,
-            text="Maximum videos to download:",
-            font=("Helvetica", 10, "bold"),
-        ).pack(anchor="w", pady=(0, 5))
-
-        max_frame = ttk.Frame(options_frame)
-        max_frame.pack(fill="x", pady=2)
-        self.max_videos_var = tk.StringVar(value="all")
-        ttk.Radiobutton(
-            max_frame,
-            text="All Videos",
-            variable=self.max_videos_var,
-            value="all",
-            style="info.TRadiobutton",
-        ).pack(side="left", padx=10)
-
-        self.max_videos_entry = ttk.Entry(max_frame, width=10, font=("Helvetica", 10))
-        self.max_videos_entry.pack(side="left", padx=(20, 5))
-        ttk.Label(max_frame, text="videos", font=("Helvetica", 10)).pack(
-            side="left", padx=5
+        # --- Custom Name Frame ---
+        name_frame = ttk.LabelFrame(
+            self.setup_tab, text="Output Folder Name", padding=15
         )
+        name_frame.pack(fill="x", pady=20)
+        ttk.Label(
+            name_frame, text="Custom Name (optional):", font=("Helvetica", 14, "bold")
+        ).pack(side="left", padx=5)
+        self.custom_name = ttk.Entry(name_frame, width=30, font=("Helvetica", 12))
+        self.custom_name.pack(side="left", fill="x", expand=True, padx=10)
 
-        # Control frame
-        control_frame = ttk.Frame(main_frame)
-        control_frame.pack(fill="x", pady=15)
+        # --- Control Frame ---
+        control_frame = ttk.Frame(self.setup_tab)
+        control_frame.pack(fill="x", pady=40)
         self.start_btn = ttk.Button(
             control_frame,
-            text="Start Download",
-            command=self.start_download,
-            style="success.TButton",
-            width=15,
+            text="▶ Start Scraping",
+            command=self.start_scraping,
+            bootstyle="success.outline",
         )
-        self.start_btn.pack(side="left", padx=5)
+        self.start_btn.pack(side="left", fill="x", expand=True, padx=10)
         self.stop_btn = ttk.Button(
             control_frame,
-            text="Stop",
-            command=self.stop_download,
-            style="danger.TButton",
+            text="■ Stop Scraping",
+            command=self.stop_scraping,
+            bootstyle="danger.outline",
             state="disabled",
-            width=10,
         )
-        self.stop_btn.pack(side="left", padx=5)
-        ttk.Button(
-            control_frame,
-            text="Copy Errors",
-            command=self.copy_errors,
-            style="warning.TButton",
-            width=12,
-        ).pack(side="left", padx=5)
+        self.stop_btn.pack(side="left", fill="x", expand=True, padx=10)
 
-        # Progress frame
-        progress_frame = ttk.Frame(main_frame)
-        progress_frame.pack(fill="x", pady=10)
+    def build_options_tab(self):
+        opts = [
+            "Extract all URLs from <a> tags",
+            "Download all images from <img> tags",
+            "Download all videos from <video> tags",
+            "Extract text content",
+            "Extract metadata (title, description, keywords)",
+            "Follow internal links (recursive scraping)",
+            "Follow external links",
+            "Save as JSON",
+            "Save as CSV",
+            "Save raw HTML",
+        ]
+        self.options = {}
 
-        ttk.Label(
-            progress_frame, text="Progress:", font=("Helvetica", 11, "bold")
-        ).pack(anchor="w")
-        self.progress = ttk.Progressbar(
-            progress_frame, mode="determinate", style="success.TProgressbar"
+        # Frame for 'Check All'
+        top_options_frame = ttk.LabelFrame(
+            self.options_tab, text="Global Options", padding=10
         )
-        self.progress.pack(fill="x", pady=(2, 0))
+        top_options_frame.pack(fill="x", pady=5)
 
-        # Stats frame
-        stats_frame = ttk.Frame(main_frame)
-        stats_frame.pack(fill="x", pady=5)
-        self.stats_label = ttk.Label(
-            stats_frame, text="Files: 0 | Profile: Not loaded", font=("Helvetica", 10)
+        self.check_all_var = tk.BooleanVar()
+        ttk.Checkbutton(
+            top_options_frame,
+            text="Check All / Uncheck All",
+            variable=self.check_all_var,
+            command=self.toggle_check_all,
+            bootstyle="info-round-toggle",
+        ).pack(anchor="w", pady=5, padx=5)
+
+        # Use Columns for better layout of the main options
+        content_opts_frame = ttk.Frame(self.options_tab)
+        content_opts_frame.pack(fill="both", expand=True, pady=10)
+
+        # Column 1: Data & Files
+        col1 = ttk.LabelFrame(content_opts_frame, text="Content Extraction", padding=15)
+        col1.pack(side="left", fill="both", expand=True, padx=10)
+
+        # Column 2: Recursion & Format
+        col2 = ttk.LabelFrame(
+            content_opts_frame, text="Linking & Output Format", padding=15
         )
-        self.stats_label.pack(anchor="w")
+        col2.pack(side="left", fill="both", expand=True, padx=10)
 
-        # Log text area
-        log_frame = ttk.LabelFrame(main_frame, text="Download Log", padding=5)
-        log_frame.pack(fill="both", expand=True, pady=10)
-
-        self.log_text = ttk.Text(log_frame, height=8, font=("Helvetica", 9))
-        scrollbar = ttk.Scrollbar(
-            log_frame, orient="vertical", command=self.log_text.yview
-        )
-        self.log_text.configure(yscrollcommand=scrollbar.set)
-
-        self.log_text.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-    def validate_tiktok_url(self, url):
-        """Validate TikTok profile URL"""
-        if not url:
-            return False, "URL cannot be empty"
-
-        try:
-            parsed = urlparse(url)
-            if not parsed.scheme or not parsed.netloc:
-                return False, "Invalid URL format"
-
-            if "tiktok.com" not in parsed.netloc:
-                return False, "Please enter a TikTok URL"
-
-            # Extract username
-            path_parts = parsed.path.strip("/").split("/")
-            if len(path_parts) >= 1 and path_parts[0].startswith("@"):
-                username = path_parts[0][1:]  # Remove @
-                if username:
-                    return True, f"TikTok profile detected: @{username}"
-
-            return (
-                False,
-                "Invalid TikTok profile URL. Use format: https://www.tiktok.com/@username",
+        for i, opt in enumerate(opts):
+            self.options[opt] = tk.BooleanVar()
+            checkbutton = ttk.Checkbutton(
+                text=opt,
+                variable=self.options[opt],
+                bootstyle="primary-round-toggle",
             )
+            if i < 5:  # Put first 5 in column 1 (Data & Files)
+                checkbutton.pack(in_=col1, anchor="w", pady=5, padx=5)
+            else:  # Put remaining 5 in column 2 (Recursion & Format)
+                checkbutton.pack(in_=col2, anchor="w", pady=5, padx=5)
 
-        except Exception as e:
-            return False, f"URL parsing error: {str(e)}"
+    def build_status_tab(self):
+        # --- Progress & File Count ---
+        status_frame = ttk.LabelFrame(
+            self.status_tab, text="Scraping Status", padding=15
+        )
+        status_frame.pack(fill="x", pady=10)
+
+        # Progressbar
+        ttk.Label(
+            status_frame, text="Activity Progress:", font=("Helvetica", 12, "bold")
+        ).pack(anchor="w", pady=5)
+        self.progress = ttk.Progressbar(
+            status_frame, mode="indeterminate", bootstyle="success-striped"
+        )
+        self.progress.pack(fill="x", pady=10)
+
+        # File Count
+        count_frame = ttk.Frame(status_frame)
+        count_frame.pack(fill="x")
+        ttk.Label(
+            count_frame, text="Total Files Saved:", font=("Helvetica", 12, "bold")
+        ).pack(side="left", anchor="w", pady=5, padx=(0, 10))
+        # self.file_count is initialized in __init__
+        ttk.Label(
+            count_frame,
+            textvariable=self.file_count,
+            font=("Helvetica", 14, "bold", "italic"),
+            bootstyle="primary",
+        ).pack(side="left", anchor="w", pady=5)
+
+        # --- Log & Error Frame ---
+        log_frame = ttk.LabelFrame(self.status_tab, text="Execution Log", padding=15)
+        log_frame.pack(fill="both", expand=True, pady=15)
+
+        # Text widget and Scrollbar
+        log_scroll = ttk.Scrollbar(log_frame, orient=VERTICAL)
+        self.log_text = ttk.Text(
+            log_frame, height=10, font=("Courier", 10), yscrollcommand=log_scroll.set
+        )
+
+        log_scroll.config(command=self.log_text.yview)
+        log_scroll.pack(side="right", fill="y")
+        self.log_text.pack(side="left", fill="both", expand=True)
+
+        # Copy Errors Button
+        ttk.Button(
+            log_frame,
+            text="Copy Errors to Clipboard",
+            command=self.copy_errors,
+            bootstyle="warning",
+        ).pack(
+            fill="x", pady=(10, 0)
+        )  # Placed under the log
 
     def browse_save(self):
-        path = filedialog.askdirectory(initialdir=self.save_path.get())
+        path = filedialog.askdirectory()
         if path:
             self.save_path.set(path)
 
@@ -246,87 +237,93 @@ class TikTokProfileDownloader(ttk.Window):
             try:
                 os.makedirs(new_path, exist_ok=True)
                 self.save_path.set(new_path)
-                self.log_queue.put(("log", f"Created directory: {new_path}\n"))
             except OSError as e:
                 error_msg = f"Failed to create directory: {str(e)}"
                 self.log_queue.put(("log", error_msg + "\n"))
                 self.error_logs.append(error_msg)
                 messagebox.showerror("Error", error_msg)
 
+    def toggle_check_all(self):
+        state = self.check_all_var.get()
+        for var in self.options.values():
+            var.set(state)
+
     def copy_errors(self):
-        try:
-            import pyperclip
+        if self.error_logs:
+            pyperclip.copy("\n".join(self.error_logs))
+            messagebox.showinfo("Success", "Error messages copied to clipboard")
+        else:
+            messagebox.showinfo("Info", "No error messages to copy")
 
-            if self.error_logs:
-                pyperclip.copy("\n".join(self.error_logs))
-                messagebox.showinfo("Success", "Error messages copied to clipboard")
-            else:
-                messagebox.showinfo("Info", "No error messages to copy")
-        except ImportError:
-            messagebox.showwarning(
-                "Warning",
-                "pyperclip not installed. Install with: pip install pyperclip",
-            )
-
-    def start_download(self):
-        # Validate URL
+    def start_scraping(self):
         url = self.url_entry.get().strip()
-        is_valid, message = self.validate_tiktok_url(url)
-        if not is_valid:
-            messagebox.showerror("Error", message)
+        if not url:
+            messagebox.showerror("Error", "Enter a URL")
+            return
+        try:
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError
+            domain = parsed.netloc
+        except ValueError:
+            error_msg = "Invalid URL format"
+            self.log_queue.put(("log", error_msg + "\n"))
+            self.error_logs.append(error_msg)
+            messagebox.showerror("Error", error_msg)
             return
 
-        # Validate save path
-        download_path = self.save_path.get()
-        if not download_path:
-            messagebox.showerror("Error", "Please select a save location")
+        custom = self.custom_name.get().strip()
+        folder_name = custom if custom else domain.replace("www.", "")
+        base_path = os.path.join(self.save_path.get(), folder_name)
+        try:
+            os.makedirs(base_path, exist_ok=True)
+        except OSError as e:
+            error_msg = f"Failed to create base directory {base_path}: {str(e)}"
+            self.log_queue.put(("log", error_msg + "\n"))
+            self.error_logs.append(error_msg)
+            messagebox.showerror("Error", error_msg)
             return
-        if not os.path.exists(download_path):
+
+        images_path = os.path.join(base_path, "images")
+        if self.options["Download all images from <img> tags"].get():
             try:
-                os.makedirs(download_path, exist_ok=True)
+                os.makedirs(images_path, exist_ok=True)
             except OSError as e:
-                messagebox.showerror("Error", f"Cannot access save location: {str(e)}")
+                error_msg = f"Failed to create images directory {images_path}: {str(e)}"
+                self.log_queue.put(("log", error_msg + "\n"))
+                self.error_logs.append(error_msg)
+                messagebox.showerror("Error", error_msg)
                 return
 
-        # Get max videos
-        max_videos = self.max_videos_var.get()
-        if max_videos != "all":
+        videos_path = os.path.join(base_path, "videos")
+        if self.options["Download all videos from <video> tags"].get():
             try:
-                max_videos = int(self.max_videos_entry.get())
-                if max_videos <= 0:
-                    raise ValueError("Must be positive")
-            except ValueError:
-                messagebox.showerror("Error", "Please enter a valid number of videos")
+                os.makedirs(videos_path, exist_ok=True)
+            except OSError as e:
+                error_msg = f"Failed to create videos directory {videos_path}: {str(e)}"
+                self.log_queue.put(("log", error_msg + "\n"))
+                self.error_logs.append(error_msg)
+                messagebox.showerror("Error", error_msg)
                 return
 
-        # Confirm large downloads
-        confirm = messagebox.askyesno(
-            "Confirm Download",
-            f"Download all videos from TikTok profile?\n\nThis may take a long time and use significant storage space.\n\nContinue?",
-        )
-        if not confirm:
-            return
-
-        # Start download
         self.stop_event.clear()
         self.error_logs = []
-        self.download_thread = threading.Thread(
-            target=self.download_profile, args=(url, download_path, max_videos)
+        self.scraping_thread = threading.Thread(
+            target=self.scrape, args=(url, base_path, images_path, videos_path)
         )
-        self.download_thread.start()
+        self.scraping_thread.start()
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
-        self.progress["value"] = 0
-        self.progress["mode"] = "determinate"
-        self.file_count = 0
-        self.total_videos = 0
-        self.profile_name = ""
+        self.progress.start()
+        self.file_count.set(0)
         self.log_text.delete(1.0, tk.END)
-        self.log_queue.put(("log", f"Starting TikTok profile download: {url}\n"))
+        self.log_queue.put(("log", "Starting scraping...\n"))
+        # Switch to the Status tab automatically
+        self.notebook.select(self.status_tab)
 
-    def stop_download(self):
+    def stop_scraping(self):
         self.stop_event.set()
-        self.log_queue.put(("log", "Stopping download...\n"))
+        self.log_queue.put(("log", "Stopping...\n"))
 
     def process_queue(self):
         try:
@@ -335,227 +332,296 @@ class TikTokProfileDownloader(ttk.Window):
                 if msg[0] == "log":
                     self.log_text.insert(tk.END, msg[1])
                     self.log_text.see(tk.END)
-                    if "Error" in msg[1] or "Failed" in msg[1]:
+                    if "Error" in msg[1] or "Failed" in msg[1] or "Skipping" in msg[1]:
+                        # Add a visual highlight for errors
+                        self.log_text.tag_config("error", foreground="#dc3545")
+                        self.log_text.tag_add("error", "end-2l", "end-1c")
                         self.error_logs.append(msg[1].strip())
-                elif msg[0] == "progress":
-                    self.progress["value"] = msg[1]
-                elif msg[0] == "set_max":
-                    self.progress["maximum"] = msg[1]
-                    self.total_videos = msg[1]
                 elif msg[0] == "inc_count":
-                    self.file_count += msg[1]
-                elif msg[0] == "profile_info":
-                    self.profile_name = msg[1]
-                elif msg[0] == "update_stats":
-                    stats_text = f"Files: {self.file_count} | Profile: {self.profile_name} | Progress: {self.progress['value']}/{self.total_videos}"
-                    self.stats_label.config(text=stats_text)
+                    self.file_count.set(self.file_count.get() + msg[1])
                 elif msg[0] == "done":
+                    self.progress.stop()
                     self.start_btn.config(state="normal")
                     self.stop_btn.config(state="disabled")
-                    if self.download_thread and self.download_thread.is_alive():
-                        self.download_thread.join(timeout=2)
-                    self.download_thread = None
-                    final_stats = f"Download completed! Files: {self.file_count} | Profile: {self.profile_name}"
-                    self.stats_label.config(text=final_stats)
-                    self.log_queue.put(
-                        (
-                            "log",
-                            f"\n🎉 Download finished! Successfully downloaded {self.file_count} videos.\n",
-                        )
-                    )
+                    # Ensure the thread is properly joined
+                    if self.scraping_thread and self.scraping_thread.is_alive():
+                        self.scraping_thread.join()
+                        self.scraping_thread = None
         except queue.Empty:
             pass
         self.after(100, self.process_queue)
 
-    def get_tiktok_options(self, download_path, download_type, quality, max_videos):
-        """Get TikTok-specific yt-dlp options"""
-        # Base output template with username folder
-        outtmpl = os.path.join(
-            download_path,
-            "%(uploader)s/%(title|%(upload_date)s - %(duration_string)s - %(view_count)s views).%(ext)s",
-        )
+    def scrape(self, start_url, base_path, images_path, videos_path):
+        options = {k: v.get() for k, v in self.options.items()}
 
-        base_options = {
-            "outtmpl": outtmpl,
-            "quiet": True,
-            "no_warnings": True,
-            "ignoreerrors": True,  # Continue on errors for TikTok
-            "continuedl": True,
-            "writesubtitles": False,
-            "writeinfojson": True,  # Save metadata
-            "writethumbnail": True,  # Save thumbnails
-            "embed_subs": False,
-            "restrictfilenames": True,
+        to_visit = collections.deque([(start_url, 0)])
+        # Use (URL, current_depth) in visited to allow revisiting at different depths if necessary, but here we keep it simple with just URL
+        visited = set()
+        data = []
+        max_depth = 3
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
 
-        # Max videos limit
-        if max_videos != "all":
-            base_options["playlistend"] = max_videos
+        while to_visit and not self.stop_event.is_set():
+            url, current_depth = to_visit.popleft()
+            if url in visited or current_depth > max_depth:
+                continue
+            visited.add(url)
+            self.log_queue.put(("log", f"Scraping {url} (depth {current_depth})...\n"))
 
-        # Format selection
-        if download_type == "audio":
-            base_options.update(
-                {
-                    "format": "bestaudio/best",
-                    "postprocessors": [
-                        {
-                            "key": "FFmpegExtractAudio",
-                            "preferredcodec": "mp3",
-                            "preferredquality": "192",
-                        }
-                    ],
-                    "keepvideo": False,
-                    "outtmpl": os.path.join(
-                        download_path,
-                        "%(uploader)s/%(title|%(upload_date)s - %(duration_string)s - %(view_count)s views).%(ext)s",
-                    ),
-                }
-            )
-        else:  # video
-            if quality == "720p":
-                base_options.update(
-                    {
-                        "format": "bestvideo[height<=720]+bestaudio/best[height<=720]",
-                        "merge_output_format": "mp4",
-                    }
-                )
-            else:
-                base_options.update(
-                    {
-                        "format": "bestvideo+bestaudio/best",
-                        "merge_output_format": "mp4",
-                    }
-                )
+            try:
+                # Set a shorter timeout for large recursive scrapes
+                resp = requests.get(url, timeout=15, headers=headers)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, "html.parser")
 
-        # TikTok specific settings
-        base_options.update(
-            {
-                "extract_flat": False,
-                "playliststart": 1,
-                "noplaylist": False,  # We want the full profile playlist
-            }
-        )
+                page_data = {"url": url}
 
-        return base_options
-
-    def download_profile(self, url, download_path, max_videos):
-        """Download entire TikTok profile"""
-        download_type = self.download_type.get()
-        quality = self.quality_var.get()
-
-        try:
-            self.log_queue.put(("log", "Preparing TikTok download options...\n"))
-
-            ydl_opts = self.get_tiktok_options(
-                download_path, download_type, quality, max_videos
-            )
-            ydl_opts["progress_hooks"] = [self.ydl_hook]
-
-            self.log_queue.put(("log", "Initializing yt-dlp for TikTok...\n"))
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # First, analyze the profile
-                self.log_queue.put(("log", "Analyzing TikTok profile...\n"))
-
-                try:
-                    # Extract info without downloading
-                    info = ydl.extract_info(url, download=False)
-
-                    # Get profile info
-                    profile_name = info.get("uploader", "Unknown")
-                    total_videos = info.get("playlist_count", 0)
-
-                    self.log_queue.put(("profile_info", profile_name))
-                    self.log_queue.put(("set_max", total_videos))
-                    self.log_queue.put(("log", f"Found profile: @{profile_name}\n"))
-                    self.log_queue.put(
-                        ("log", f"Total videos available: {total_videos}\n")
-                    )
-
-                    # Create profile folder
-                    profile_folder = os.path.join(download_path, profile_name)
-                    os.makedirs(profile_folder, exist_ok=True)
-
-                    self.log_queue.put(("update_stats", ""))
-
-                except Exception as analysis_error:
-                    self.log_queue.put(
-                        ("log", f"Analysis warning: {str(analysis_error)}\n")
-                    )
-                    self.log_queue.put(("set_max", 100))  # Default max
-                    self.log_queue.put(("profile_info", "Unknown"))
-                    total_videos = 100
-
-                # Start downloading
-                self.log_queue.put(("log", "🚀 Starting video downloads...\n"))
-                ydl.download([url])
-
-                self.log_queue.put(
-                    (
-                        "log",
-                        f"\n✅ Profile download completed for @{self.profile_name}\n",
-                    )
-                )
-                self.log_queue.put(("done",))
-
-        except yt_dlp.utils.DownloadCancelled:
-            self.log_queue.put(("log", "\n⏹️ Download cancelled by user\n"))
-        except yt_dlp.utils.DownloadError as e:
-            error_msg = f"TikTok download error: {str(e)}"
-            self.log_queue.put(("log", f"\n❌ {error_msg}\n"))
-            self.error_logs.append(error_msg)
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            self.log_queue.put(("log", f"\n❌ {error_msg}\n"))
-            self.error_logs.append(error_msg)
-        finally:
-            self.log_queue.put(("done",))
-
-    def ydl_hook(self, d):
-        """Progress hook for yt-dlp"""
-        if self.stop_event.is_set():
-            raise yt_dlp.utils.DownloadCancelled("Download stopped by user")
-
-        try:
-            if d["status"] == "downloading":
-                # Get video info
-                title = d.get("title", "Unknown video")[:60]
-                uploader = d.get("uploader", "Unknown")[:20]
-                duration = d.get("duration_string", "Unknown")
-
-                if "_percent_str" in d:
-                    percent_str = d.get("_percent_str", "0%")
+                # --- 1. Extract Metadata ---
+                if options["Extract metadata (title, description, keywords)"]:
                     try:
-                        percent = float(percent_str.rstrip("%"))
-                        self.log_queue.put(("progress", percent))
-                    except (ValueError, TypeError):
-                        pass
+                        title = (
+                            soup.find("title").string.strip()
+                            if soup.find("title") and soup.find("title").string
+                            else ""
+                        )
+                        desc_tag = soup.find("meta", attrs={"name": "description"})
+                        desc = (
+                            desc_tag["content"].strip()
+                            if desc_tag and desc_tag.get("content")
+                            else ""
+                        )
+                        keys_tag = soup.find("meta", attrs={"name": "keywords"})
+                        keys = (
+                            keys_tag["content"].strip()
+                            if keys_tag and keys_tag.get("content")
+                            else ""
+                        )
+                        page_data["title"] = title
+                        page_data["description"] = desc
+                        page_data["keywords"] = keys
+                    except Exception as e:
+                        error_msg = f"Error extracting metadata from {url}: {str(e)}"
+                        self.log_queue.put(("log", error_msg + "\n"))
+                        self.error_logs.append(error_msg)
+                        page_data.update(
+                            {"title": "", "description": "", "keywords": ""}
+                        )
 
-                # Update progress for current video
-                self.log_queue.put(
-                    ("log", f"⬇️ [{uploader}] {title} ({duration}) - {percent_str}\n")
+                # --- 2. Extract Text Content ---
+                if options["Extract text content"]:
+                    try:
+                        # Improved text extraction to remove script/style tags
+                        for script_or_style in soup(["script", "style"]):
+                            script_or_style.extract()
+                        text = soup.get_text(separator="\n", strip=True)
+                        page_data["text"] = text
+                    except Exception as e:
+                        error_msg = f"Error extracting text from {url}: {str(e)}"
+                        self.log_queue.put(("log", error_msg + "\n"))
+                        self.error_logs.append(error_msg)
+                        page_data["text"] = ""
+
+                # --- 3. Extract Links ---
+                if options["Extract all URLs from <a> tags"]:
+                    try:
+                        links = [
+                            urljoin(url, a["href"])
+                            for a in soup.find_all("a", href=True)
+                            # Basic filtering of non-HTTP/HTTPS links
+                            if urlparse(urljoin(url, a["href"])).scheme
+                            in ("http", "https")
+                        ]
+                        page_data["links"] = links
+                    except Exception as e:
+                        error_msg = f"Error extracting links from {url}: {str(e)}"
+                        self.log_queue.put(("log", error_msg + "\n"))
+                        self.error_logs.append(error_msg)
+                        page_data["links"] = []
+
+                # --- 4. Download Images ---
+                if options["Download all images from <img> tags"]:
+                    imgs = soup.find_all("img", src=True)
+                    for img in imgs:
+                        img_url = urljoin(url, img["src"])
+                        self.download_file(img_url, images_path, "image", headers)
+
+                # --- 5. Download Videos ---
+                if options["Download all videos from <video> tags"]:
+                    videos = soup.find_all("video")
+                    for video in videos:
+                        sources = video.find_all("source", src=True)
+                        if sources:
+                            for source in sources:
+                                self.download_file(
+                                    urljoin(url, source["src"]),
+                                    videos_path,
+                                    "video",
+                                    headers,
+                                )
+                        elif video.get("src"):
+                            self.download_file(
+                                urljoin(url, video["src"]),
+                                videos_path,
+                                "video",
+                                headers,
+                            )
+
+                # --- 6. Save Raw HTML ---
+                if options["Save raw HTML"]:
+                    try:
+                        # Create a clean filename from the URL path
+                        path_parts = urlparse(url).path.strip("/").replace("/", "_")
+                        # If path is empty (homepage), use 'index'
+                        html_filename = f"{path_parts or 'index'}_{datetime.now().strftime('%H%M%S')}.html"
+                        html_path = os.path.join(base_path, html_filename)
+                        with open(html_path, "w", encoding="utf-8") as f:
+                            f.write(resp.text)
+                        self.log_queue.put(("log", f"Saved HTML to {html_filename}\n"))
+                        self.log_queue.put(("inc_count", 1))
+                    except OSError as e:
+                        error_msg = f"Error saving HTML for {url}: {str(e)}"
+                        self.log_queue.put(("log", error_msg + "\n"))
+                        self.error_logs.append(error_msg)
+
+                data.append(page_data)
+
+                # --- 7. Recursive / External Linking ---
+                if (
+                    options["Follow internal links (recursive scraping)"]
+                    or options["Follow external links"]
+                ):
+                    for link in page_data.get("links", []):
+                        parsed_link = urlparse(link)
+                        # Skip fragment links and links outside http/https (already filtered, but good to check)
+                        if not parsed_link.netloc or parsed_link.scheme not in (
+                            "http",
+                            "https",
+                        ):
+                            continue
+
+                        # Check if the link is internal (same netloc)
+                        is_internal = parsed_link.netloc == urlparse(start_url).netloc
+
+                        if (
+                            is_internal
+                            and options["Follow internal links (recursive scraping)"]
+                        ) or (not is_internal and options["Follow external links"]):
+                            if link not in visited and current_depth + 1 <= max_depth:
+                                to_visit.append((link, current_depth + 1))
+
+            except requests.exceptions.RequestException as e:
+                error_msg = f"Error scraping {url}: {str(e)}"
+                self.log_queue.put(("log", error_msg + "\n"))
+                self.error_logs.append(error_msg)
+
+        # --- 8. Save Final JSON/CSV ---
+        if data and not self.stop_event.is_set():
+            if options["Save as JSON"]:
+                try:
+                    json_path = os.path.join(base_path, "data.json")
+                    with open(json_path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=4)
+                    self.log_queue.put(("log", f"Saved JSON to data.json\n"))
+                    self.log_queue.put(("inc_count", 1))
+                except (OSError, TypeError) as e:
+                    error_msg = f"Error saving JSON: {str(e)}"
+                    self.log_queue.put(("log", error_msg + "\n"))
+                    self.error_logs.append(error_msg)
+
+            if options["Save as CSV"]:
+                try:
+                    fields = set()
+                    for d in data:
+                        # Handle list type fields (like 'links') for CSV simplicity by skipping them
+                        fields.update(
+                            k for k, v in d.items() if not isinstance(v, list)
+                        )
+                    fields = sorted(fields)
+                    csv_path = os.path.join(base_path, "data.csv")
+                    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+                        writer = csv.DictWriter(f, fieldnames=fields)
+                        writer.writeheader()
+                        # Clean up data before writing to CSV
+                        cleaned_data = [
+                            {k: v for k, v in row.items() if k in fields}
+                            for row in data
+                        ]
+                        writer.writerows(cleaned_data)
+                    self.log_queue.put(("log", f"Saved CSV to data.csv\n"))
+                    self.log_queue.put(("inc_count", 1))
+                except (OSError, TypeError) as e:
+                    error_msg = f"Error saving CSV: {str(e)}"
+                    self.log_queue.put(("log", error_msg + "\n"))
+                    self.error_logs.append(error_msg)
+
+        self.log_queue.put(("log", "Scraping completed.\n"))
+        self.log_queue.put(("done",))
+
+    def download_file(self, file_url, save_path, file_type, headers):
+        """Generic method to download a file (image or video) and handle errors."""
+
+        # Check for stop signal before initiating download
+        if self.stop_event.is_set():
+            return
+
+        allowed_extensions = {
+            "image": (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"),
+            "video": (".mp4", ".webm", ".ogg", ".mov", ".avi", ".mkv"),
+        }
+
+        try:
+            # Check for valid URL and file extension
+            if not file_url or not any(
+                file_url.lower().endswith(ext)
+                for ext in allowed_extensions.get(file_type, ())
+            ):
+                error_msg = f"Skipping invalid {file_type.upper()} URL: {file_url}"
+                self.log_queue.put(("log", error_msg + "\n"))
+                return
+
+            # Request the file
+            timeout = 10 if file_type == "video" else 5
+            # Use stream=True for potentially large files (videos/images)
+            resp = requests.get(file_url, timeout=timeout, headers=headers, stream=True)
+            resp.raise_for_status()
+
+            # Determine filename
+            url_path = urlparse(file_url).path
+            filename = os.path.basename(url_path)
+
+            # Fallback/default filename if path is empty or invalid
+            if not filename or os.path.isdir(os.path.join(save_path, filename)):
+                # Use a unique timestamp for a filename
+                ext = next(
+                    (
+                        ext
+                        for ext in allowed_extensions.get(file_type, ())
+                        if file_url.lower().endswith(ext)
+                    ),
+                    f".{file_type}",
+                )
+                filename = (
+                    f"{file_type}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}{ext}"
                 )
 
-            elif d["status"] == "finished":
-                # File completed
-                filename = d.get("filename", "")
-                if filename:
-                    basename = os.path.basename(filename)
-                    self.log_queue.put(("log", f"✅ Saved: {basename}\n"))
-                    self.log_queue.put(("inc_count", 1))
-                    self.log_queue.put(("update_stats", ""))
+            full_path = os.path.join(save_path, filename)
 
-            elif d["status"] == "error":
-                # Download error
-                error = d.get("error", "Unknown error")
-                title = d.get("title", "Unknown video")[:50]
-                self.log_queue.put(("log", f"❌ Failed '{title}': {error[:80]}...\n"))
-                self.error_logs.append(f"Error downloading '{title}': {error}")
+            # Save the file in chunks
+            with open(full_path, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
 
-        except Exception as e:
-            self.log_queue.put(("log", f"⚠️ Progress error: {str(e)}\n"))
+            self.log_queue.put(("log", f"Downloaded {file_type} {filename}\n"))
+            self.log_queue.put(("inc_count", 1))
+
+        except (requests.exceptions.RequestException, OSError, ValueError) as e:
+            error_msg = f"Error downloading {file_type} {file_url}: {str(e)}"
+            self.log_queue.put(("log", error_msg + "\n"))
 
 
 if __name__ == "__main__":
-    app = TikTokProfileDownloader()
+    app = ScraperApp()
     app.mainloop()

@@ -1,8 +1,0 @@
-Package: pyscrape
-Version: 1.0
-Section: utils
-Priority: optional
-Architecture: amd64
-Maintainer: Your Name <you@example.com>
-Description: PyScrape Python GUI App
-

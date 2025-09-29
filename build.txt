@@ -25,7 +25,7 @@ dpkg-deb --build pyscrape_deb
 
 
 #MacOS
-pyinstaller --onefile --windowed pyscrape.py
+pyinstaller --onefile --windowed app/app.py
 
-hdiutil create -volname PyScrape -srcfolder dist/pyscrape.app -ov -format UDZO PyScrape.dmg
+hdiutil create -volname PyScrape -srcfolder dist/app.app -ov -format UDZO PyScrape.dmg
 

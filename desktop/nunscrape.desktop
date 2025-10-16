@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=nunScrape
+Comment=Python Web Scraper GUI Tool
+Exec=/usr/bin/nunscrape
+Icon=/usr/share/pixmaps/nunscrape.png
+Terminal=false
+Type=Application
+Categories=Utility;Network;
+StartupNotify=true

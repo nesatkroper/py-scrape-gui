@@ -1,61 +1,116 @@
-#!/usr/bin/env fish
+#!/bin/bash
 
-set APP_NAME "Nun Speed"
-set PYTHON_SCRIPT "src/g-speed.py"
-set APP_ICON "assets/images/speed.png"
-set EXECUTABLE_NAME "nun-speed"
-set DESKTOP_FILE "$HOME/.local/share/applications/$EXECUTABLE_NAME.desktop"
-set VENV_DIR "$HOME/.nun_speed_venv"
+# ┌────────────────────────────────────────────┐
+# │            Nun Speed Installer             │
+# └────────────────────────────────────────────┘
 
-echo "-------------------------------------------------"
-echo "Nun Speed Installer (Fish shell)"
-echo "-------------------------------------------------"
+set -e
 
-# Step 1: Install system dependencies
-echo "Installing system dependencies..."
-sudo apt update
-sudo apt install -y python3-venv python3-tk python3-pip
+APP_NAME="Nun Speed"
+SCRIPT_NAME="g-speed.py"
+ICON_NAME="speed.png"
+INSTALL_DIR="$HOME/.local/share/nun-speed"
+DESKTOP_FILE="$HOME/.local/share/applications/nun-speed.desktop"
 
-# Step 2: Create virtual environment
-if not test -d $VENV_DIR
-    echo "Creating virtual environment..."
-    python3 -m venv $VENV_DIR
-end
+echo "[+] Installing $APP_NAME..."
 
-# Step 3: Activate venv and install Python packages
-echo "Installing Python packages in venv..."
-source $VENV_DIR/bin/activate.fish
-pip install --upgrade pip
-pip install psutil speedtest-cli pyinstaller
+# Create install directory
+mkdir -p "$INSTALL_DIR"
 
-# Step 4: Build the executable
-echo "Building the app..."
-pyinstaller --name "$APP_NAME" \
-            --onefile \
-            --windowed \
-            --add-data "$APP_ICON:assets/images" \
-            "$PYTHON_SCRIPT"
+# Copy app files
+cp "$(dirname "$0")/../src/$SCRIPT_NAME" "$INSTALL_DIR/"
+cp "$(dirname "$0")/../assets/images/$ICON_NAME" "$INSTALL_DIR/"
 
-# Step 5: Install executable
-echo "Installing executable..."
-mkdir -p $HOME/.local/bin
-cp "dist/$APP_NAME" "$HOME/.local/bin/$EXECUTABLE_NAME"
-chmod +x "$HOME/.local/bin/$EXECUTABLE_NAME"
+# Create desktop launcher
+echo "[+] Creating desktop launcher..."
 
-# Step 6: Create .desktop launcher
-echo "Creating launcher..."
-mkdir -p (dirname $DESKTOP_FILE)
-echo "[Desktop Entry]" > $DESKTOP_FILE
-echo "Name=$APP_NAME" >> $DESKTOP_FILE
-echo "Comment=System & Internet Monitor" >> $DESKTOP_FILE
-echo "Exec=$HOME/.local/bin/$EXECUTABLE_NAME" >> $DESKTOP_FILE
-echo "Icon="(realpath $APP_ICON) >> $DESKTOP_FILE
-echo "Terminal=false" >> $DESKTOP_FILE
-echo "Type=Application" >> $DESKTOP_FILE
-echo "Categories=Utility;" >> $DESKTOP_FILE
-chmod +x $DESKTOP_FILE
+cat > "$DESKTOP_FILE" <<EOL
+[Desktop Entry]
+Name=$APP_NAME
+Comment=Check your internet speed easily
+Exec=python3 $INSTALL_DIR/$SCRIPT_NAME
+Icon=$INSTALL_DIR/$ICON_NAME
+Terminal=false
+Type=Application
+Categories=Utility;Network;
+EOL
 
-echo "-------------------------------------------------"
-echo "$APP_NAME installed successfully!"
-echo "You can run it via Applications menu or type '$EXECUTABLE_NAME' in terminal."
-echo "-------------------------------------------------"
+chmod +x "$DESKTOP_FILE"
+
+echo "[✓] $APP_NAME installed successfully. You can find it in your application menu."
+
+# ─────────────────────────────────────────────
+# Optional: Build .deb package
+# ─────────────────────────────────────────────
+read -p "Build .deb package? (y/n): " build_deb
+if [[ "$build_deb" == "y" ]]; then
+    echo "[+] Building .deb package..."
+
+    TMP_DIR="./nun-speed-deb"
+    rm -rf "$TMP_DIR"
+    mkdir -p "$TMP_DIR/DEBIAN"
+    mkdir -p "$TMP_DIR/usr/local/bin"
+    mkdir -p "$TMP_DIR/usr/share/applications"
+    mkdir -p "$TMP_DIR/usr/share/icons"
+
+    # Copy files
+    cp "$(dirname "$0")/../src/$SCRIPT_NAME" "$TMP_DIR/usr/local/bin/$SCRIPT_NAME"
+    cp "$(dirname "$0")/../assets/images/$ICON_NAME" "$TMP_DIR/usr/share/icons/nun-speed.png"
+
+    # Create desktop entry
+    cat > "$TMP_DIR/usr/share/applications/nun-speed.desktop" <<EOL
+[Desktop Entry]
+Name=$APP_NAME
+Comment=Check your internet speed easily
+Exec=python3 /usr/local/bin/$SCRIPT_NAME
+Icon=/usr/share/icons/nun-speed.png
+Terminal=false
+Type=Application
+Categories=Utility;Network;
+EOL
+
+    # Control file
+    cat > "$TMP_DIR/DEBIAN/control" <<EOL
+Package: nun-speed
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3
+Maintainer: $(whoami)
+Description: Nun Speed - Internet Speed Test Tool
+ A lightweight tool to measure your internet connection speed.
+EOL
+
+    dpkg-deb --build "$TMP_DIR"
+    mv nun-speed-deb.deb nun-speed_1.0_all.deb
+
+    echo "[✓] .deb package created: nun-speed_1.0_all.deb"
+fi
+
+# ─────────────────────────────────────────────
+# Optional: Build .exe for Windows
+# ─────────────────────────────────────────────
+read -p "Build Windows .exe with PyInstaller? (y/n): " build_exe
+if [[ "$build_exe" == "y" ]]; then
+    if ! command -v pyinstaller &> /dev/null; then
+        echo "[!] PyInstaller not found. Installing..."
+        pip install pyinstaller
+    fi
+
+    if ! command -v convert &> /dev/null; then
+        echo "[!] ImageMagick (convert) not found. Please install it to convert PNG to ICO."
+        exit 1
+    fi
+
+    ICON_PATH="$(dirname "$0")/../assets/images/nun-speed.ico"
+    echo "[+] Generating .ico icon..."
+    convert "$(dirname "$0")/../assets/images/$ICON_NAME" "$ICON_PATH"
+
+    echo "[+] Building .exe with PyInstaller..."
+    pyinstaller --onefile --noconsole --icon="$ICON_PATH" "$(dirname "$0")/../src/$SCRIPT_NAME"
+
+    echo "[✓] Windows .exe created: dist/g-speed.exe"
+fi
+
+echo "[✔] Done!"

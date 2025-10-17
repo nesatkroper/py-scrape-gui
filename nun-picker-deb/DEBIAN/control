@@ -1,0 +1,9 @@
+Package: nun-picker
+Version: 1.0
+Section: graphics
+Priority: optional
+Architecture: all
+Depends: python3
+Maintainer: nun
+Description: Nun Picker - Color Picker Tool
+ A simple and lightweight tool to pick and identify colors from your screen.

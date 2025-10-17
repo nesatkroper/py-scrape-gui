@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Nun Speed
+Comment=Check your internet speed easily
+Exec=python3 ~/.local/share/nun-speed/g-speed.py
+Icon=~/.local/share/nun-speed/speed.png
+Terminal=false
+Type=Application
+Categories=Utility;Network;

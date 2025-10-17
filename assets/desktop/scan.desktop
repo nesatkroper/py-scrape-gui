@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Nun Scan
+Comment=Scan networks and analyze devices easily
+Exec=python3 ~/.local/share/nun-scan/x-scanner.py
+Icon=~/.local/share/nun-scan/scan.png
+Terminal=false
+Type=Application
+Categories=Utility;Network;Security;

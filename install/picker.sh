@@ -1,64 +1,116 @@
 #!/bin/bash
-# Nun Picker Installer
-# Installs the Python screen color picker application.
-# Run: sudo bash install.sh
 
-# --- Configuration ---
-APP_NAME="nunpicker"
-APP_TITLE="Nun Picker"
-PY_FILE="src/picker.py"
-ICON_PATH="assets/images/picker.png"
-DESKTOP_FILE="picker.desktop"
-# ---------------------
+# ┌────────────────────────────────────────────┐
+# │             Nun Picker Installer           │
+# └────────────────────────────────────────────┘
 
-echo "🔧 Starting installation of $APP_TITLE..."
+set -e
 
-# 1. Ensure running as root
-if [ "$EUID" -ne 0 ]; then
-  echo "❌ Error: Please run the installer as root using: sudo bash install.sh"
-  exit 1
+APP_NAME="Nun Picker"
+SCRIPT_NAME="picker.py"
+ICON_NAME="color-picker.png"
+INSTALL_DIR="$HOME/.local/share/nun-picker"
+DESKTOP_FILE="$HOME/.local/share/applications/nun-picker.desktop"
+
+echo "[+] Installing $APP_NAME..."
+
+# Create install directory
+mkdir -p "$INSTALL_DIR"
+
+# Copy files
+cp "$(dirname "$0")/../src/$SCRIPT_NAME" "$INSTALL_DIR/"
+cp "$(dirname "$0")/../assets/images/$ICON_NAME" "$INSTALL_DIR/"
+
+# Create desktop launcher
+echo "[+] Creating desktop launcher..."
+
+cat > "$DESKTOP_FILE" <<EOL
+[Desktop Entry]
+Name=$APP_NAME
+Comment=Pick and identify colors from your screen
+Exec=python3 $INSTALL_DIR/$SCRIPT_NAME
+Icon=$INSTALL_DIR/$ICON_NAME
+Terminal=false
+Type=Application
+Categories=Graphics;Utility;
+EOL
+
+chmod +x "$DESKTOP_FILE"
+
+echo "[✓] $APP_NAME installed successfully. You can find it in your application menu."
+
+# ─────────────────────────────────────────────
+# Optional: Build .deb package
+# ─────────────────────────────────────────────
+read -p "Build .deb package? (y/n): " build_deb
+if [[ "$build_deb" == "y" ]]; then
+    echo "[+] Building .deb package..."
+
+    TMP_DIR="./nun-picker-deb"
+    rm -rf "$TMP_DIR"
+    mkdir -p "$TMP_DIR/DEBIAN"
+    mkdir -p "$TMP_DIR/usr/local/bin"
+    mkdir -p "$TMP_DIR/usr/share/applications"
+    mkdir -p "$TMP_DIR/usr/share/icons"
+
+    # Copy app files
+    cp "$(dirname "$0")/../src/$SCRIPT_NAME" "$TMP_DIR/usr/local/bin/$SCRIPT_NAME"
+    cp "$(dirname "$0")/../assets/images/$ICON_NAME" "$TMP_DIR/usr/share/icons/nun-picker.png"
+
+    # Desktop entry for system-wide install
+    cat > "$TMP_DIR/usr/share/applications/nun-picker.desktop" <<EOL
+[Desktop Entry]
+Name=$APP_NAME
+Comment=Pick and identify colors from your screen
+Exec=python3 /usr/local/bin/$SCRIPT_NAME
+Icon=/usr/share/icons/nun-picker.png
+Terminal=false
+Type=Application
+Categories=Graphics;Utility;
+EOL
+
+    # Control file
+    cat > "$TMP_DIR/DEBIAN/control" <<EOL
+Package: nun-picker
+Version: 1.0
+Section: graphics
+Priority: optional
+Architecture: all
+Depends: python3
+Maintainer: $(whoami)
+Description: Nun Picker - Color Picker Tool
+ A simple and lightweight tool to pick and identify colors from your screen.
+EOL
+
+    dpkg-deb --build "$TMP_DIR"
+    mv nun-picker-deb.deb nun-picker_1.0_all.deb
+
+    echo "[✓] .deb package created: nun-picker_1.0_all.deb"
 fi
 
-# 2. Check dependencies (Python 3)
-if ! command -v python3 &> /dev/null; then
-  echo "❌ Error: Python3 not found. Please install Python 3 first."
-  exit 1
+# ─────────────────────────────────────────────
+# Optional: Build .exe for Windows
+# ─────────────────────────────────────────────
+read -p "Build Windows .exe with PyInstaller? (y/n): " build_exe
+if [[ "$build_exe" == "y" ]]; then
+    if ! command -v pyinstaller &> /dev/null; then
+        echo "[!] PyInstaller not found. Installing..."
+        pip install pyinstaller
+    fi
+
+    if ! command -v convert &> /dev/null; then
+        echo "[!] ImageMagick (convert) not found. Please install it to convert PNG to ICO."
+        exit 1
+    fi
+
+    ICON_PATH="$(dirname "$0")/../assets/images/nun-picker.ico"
+    echo "[+] Generating .ico icon..."
+    convert "$(dirname "$0")/../assets/images/$ICON_NAME" "$ICON_PATH"
+
+    echo "[+] Building .exe with PyInstaller..."
+    pyinstaller --onefile --noconsole --icon="$ICON_PATH" "$(dirname "$0")/../src/$SCRIPT_NAME"
+
+    echo "[✓] Windows .exe created: dist/picker.exe"
 fi
 
-# 3. Check and install Python dependencies (Pillow is essential for screen capture)
-if ! python3 -c "import PIL" &> /dev/null; then
-  echo "📦 Installing missing dependency: Pillow (PIL)"
-  pip3 install Pillow
-  if [ $? -ne 0 ]; then
-    echo "❌ Error: Failed to install Pillow. Installation aborted."
-    exit 1
-  fi
-fi
-
-# 4. Copy the Python script (The core executable)
-echo "📂 Copying Python file and setting executable path to /usr/local/bin/$APP_NAME..."
-cp "$PY_FILE" /usr/local/bin/$APP_NAME
-chmod +x /usr/local/bin/$APP_NAME
-
-# 5. Copy icon
-if [ -f "$ICON_PATH" ]; then
-    echo "🖼️ Copying icon to /usr/share/pixmaps..."
-    mkdir -p /usr/share/pixmaps/
-    cp "$ICON_PATH" /usr/share/pixmaps/$APP_NAME.png
-else
-    echo "⚠️ Warning: Icon file ($ICON_PATH) not found. Skipping icon installation."
-fi
-
-# 6. Copy .desktop file
-if [ -f "$DESKTOP_FILE" ]; then
-    echo "🧩 Installing desktop entry to /usr/share/applications/..."
-    cp "$DESKTOP_FILE" /usr/share/applications/$DESKTOP_FILE
-    # Ensure the desktop file points to the correct executable path
-    sed -i "s|Exec=/usr/local/bin/nunpicker|Exec=/usr/local/bin/$APP_NAME|" /usr/share/applications/$DESKTOP_FILE
-else
-    echo "❌ Error: Desktop file ($DESKTOP_FILE) not found. Installation aborted."
-    exit 1
-fi
-
-echo "✅ Installation complete!"
-echo "You can now run '$APP_TITLE' from your application menu or by typing: $APP_NAME"
+echo "[✔] Done!"

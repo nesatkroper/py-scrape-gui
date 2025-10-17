@@ -1,0 +1,9 @@
+Package: nun-speed
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3
+Maintainer: nun
+Description: Nun Speed - Internet Speed Test Tool
+ A lightweight tool to measure your internet connection speed.

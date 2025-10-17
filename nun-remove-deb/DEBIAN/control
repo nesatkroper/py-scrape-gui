@@ -1,0 +1,9 @@
+Package: nun-remove
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3
+Maintainer: nun
+Description: Nun Remove - App and System Cleaner
+ A lightweight tool to remove apps and perform basic system cleanup.

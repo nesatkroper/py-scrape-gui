@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# ┌────────────────────────────────────────────┐
-# │             Nun Scrape Installer           │
-# └────────────────────────────────────────────┘
 
 set -e
 
@@ -14,14 +11,11 @@ DESKTOP_FILE="$HOME/.local/share/applications/nun-scrape.desktop"
 
 echo "[+] Installing $APP_NAME..."
 
-# Create install directory
 mkdir -p "$INSTALL_DIR"
 
-# Copy app files
 cp "$(dirname "$0")/../src/$SCRIPT_NAME" "$INSTALL_DIR/"
 cp "$(dirname "$0")/../assets/images/$ICON_NAME" "$INSTALL_DIR/"
 
-# Create desktop launcher
 echo "[+] Creating desktop launcher..."
 
 cat > "$DESKTOP_FILE" <<EOL
@@ -39,9 +33,6 @@ chmod +x "$DESKTOP_FILE"
 
 echo "[✓] $APP_NAME installed successfully. You can find it in your application menu."
 
-# ─────────────────────────────────────────────
-# Optional: Build .deb package
-# ─────────────────────────────────────────────
 read -p "Build .deb package? (y/n): " build_deb
 if [[ "$build_deb" == "y" ]]; then
     echo "[+] Building .deb package..."
@@ -53,11 +44,9 @@ if [[ "$build_deb" == "y" ]]; then
     mkdir -p "$TMP_DIR/usr/share/applications"
     mkdir -p "$TMP_DIR/usr/share/icons"
 
-    # Copy app files
     cp "$(dirname "$0")/../src/$SCRIPT_NAME" "$TMP_DIR/usr/local/bin/$SCRIPT_NAME"
     cp "$(dirname "$0")/../assets/images/$ICON_NAME" "$TMP_DIR/usr/share/icons/nun-scrape.png"
 
-    # Desktop entry for system-wide install
     cat > "$TMP_DIR/usr/share/applications/nun-scrape.desktop" <<EOL
 [Desktop Entry]
 Name=$APP_NAME
@@ -69,7 +58,6 @@ Type=Application
 Categories=Network;Utility;Development;
 EOL
 
-    # Control file
     cat > "$TMP_DIR/DEBIAN/control" <<EOL
 Package: nun-scrape
 Version: 1.0
@@ -88,9 +76,6 @@ EOL
     echo "[✓] .deb package created: nun-scrape_1.0_all.deb"
 fi
 
-# ─────────────────────────────────────────────
-# Optional: Build .exe for Windows
-# ─────────────────────────────────────────────
 read -p "Build Windows .exe with PyInstaller? (y/n): " build_exe
 if [[ "$build_exe" == "y" ]]; then
     if ! command -v pyinstaller &> /dev/null; then

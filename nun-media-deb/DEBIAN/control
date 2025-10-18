@@ -1,0 +1,9 @@
+Package: nun-media
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3
+Maintainer: root
+Description: Nun Media - Media Processing Tool
+ A simple app to manipulate media using MoviePy and Rembg.

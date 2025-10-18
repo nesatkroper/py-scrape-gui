@@ -11,10 +11,6 @@ clear:
 	python3 -m venv venv
 	source venv/bin/activate.fish
 
-
-# 	find . -name "*.pyc" -delete 
-# 	find . -name "__pycache__" -type d -exec rm -rf {} +
-
 i: 
 	pip install -r requirements.txt
 
@@ -41,10 +37,6 @@ dec:
 
 dex:
   $(DEX_PYTHON) src/x-media.py
-
-
-# dex:
-# 	python src/x-media.py
 
 # IP CHECK
 ipc:

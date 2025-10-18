@@ -14,7 +14,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
 from PIL import Image
-import moviepy.editor as mp
+import moviepy as mp
 from rembg import remove
 import pytesseract
 from PyPDF2 import PdfReader
@@ -28,7 +28,8 @@ import secrets
 import string
 import threading
 import io
-import pdf2image 
+import pdf2image
+
 
 class MultiToolUtility:
     def __init__(self, root):
@@ -63,14 +64,25 @@ class MultiToolUtility:
             "Encrypt/Decrypt Text",
             "PDF to Word",
             "PDF to Excel",
-            "Help/About"
+            "Help/About",
         ]
 
         self.tool_var = tk.StringVar(value="")
         for tool in tools:
-            btn = tk.Radiobutton(self.sidebar, text=tool, variable=self.tool_var, value=tool,
-                                 command=self.load_tool, bg=self.bg, fg=self.fg, selectcolor=self.accent,
-                                 font=self.font, anchor="w", indicatoron=0, highlightthickness=0)
+            btn = tk.Radiobutton(
+                self.sidebar,
+                text=tool,
+                variable=self.tool_var,
+                value=tool,
+                command=self.load_tool,
+                bg=self.bg,
+                fg=self.fg,
+                selectcolor=self.accent,
+                font=self.font,
+                anchor="w",
+                indicatoron=0,
+                highlightthickness=0,
+            )
             btn.pack(fill="x", pady=5)
 
         # Main content area
@@ -102,14 +114,14 @@ class MultiToolUtility:
             "Encrypt/Decrypt Text": self.encrypt_decrypt_tool,
             "PDF to Word": self.pdf_to_word_tool,
             "PDF to Excel": self.pdf_to_excel_tool,
-            "Help/About": self.help_about_tool
+            "Help/About": self.help_about_tool,
         }
         if tool in method_map:
             method_map[tool]()
 
     # Helper to update progress in thread-safe way
     def update_progress(self, progress_bar):
-        progress_bar['value'] += 1
+        progress_bar["value"] += 1
 
     # Helper for output folder selection
     def select_output_folder(self, var):
@@ -124,45 +136,108 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Select Images:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
-        self.images_list = tk.Listbox(frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5)
+        tk.Label(
+            frame, text="Select Images:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=0, column=0, sticky="w")
+        self.images_list = tk.Listbox(
+            frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5
+        )
         self.images_list.grid(row=1, column=0, columnspan=3, sticky="ew", pady=5)
-        btn_select = tk.Button(frame, text="Browse", command=self.select_images, bg=self.accent, fg=self.fg, font=self.font)
+        btn_select = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_images,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_select.grid(row=0, column=1, sticky="w")
 
-        tk.Label(frame, text="Quality (1-100):", bg=self.bg, fg=self.fg, font=self.font).grid(row=2, column=0, sticky="w")
+        tk.Label(
+            frame, text="Quality (1-100):", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=2, column=0, sticky="w")
         self.quality_var = tk.IntVar(value=80)
-        tk.Entry(frame, textvariable=self.quality_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=2, column=1, sticky="ew")
+        tk.Entry(
+            frame,
+            textvariable=self.quality_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=2, column=1, sticky="ew")
 
-        tk.Label(frame, text="Target Width (optional):", bg=self.bg, fg=self.fg, font=self.font).grid(row=3, column=0, sticky="w")
+        tk.Label(
+            frame,
+            text="Target Width (optional):",
+            bg=self.bg,
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=3, column=0, sticky="w")
         self.width_var = tk.IntVar(value=0)
-        tk.Entry(frame, textvariable=self.width_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=3, column=1, sticky="ew")
+        tk.Entry(
+            frame, textvariable=self.width_var, bg="#3c3c3c", fg=self.fg, font=self.font
+        ).grid(row=3, column=1, sticky="ew")
 
-        tk.Label(frame, text="Target Height (optional):", bg=self.bg, fg=self.fg, font=self.font).grid(row=4, column=0, sticky="w")
+        tk.Label(
+            frame,
+            text="Target Height (optional):",
+            bg=self.bg,
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=4, column=0, sticky="w")
         self.height_var = tk.IntVar(value=0)
-        tk.Entry(frame, textvariable=self.height_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=4, column=1, sticky="ew")
+        tk.Entry(
+            frame,
+            textvariable=self.height_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=4, column=1, sticky="ew")
 
-        tk.Label(frame, text="Output Folder:", bg=self.bg, fg=self.fg, font=self.font).grid(row=5, column=0, sticky="w")
+        tk.Label(
+            frame, text="Output Folder:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=5, column=0, sticky="w")
         self.output_folder_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.output_folder_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=5, column=1, sticky="ew")
-        btn_browse_out = tk.Button(frame, text="Browse", command=lambda: self.select_output_folder(self.output_folder_var), bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.output_folder_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=5, column=1, sticky="ew")
+        btn_browse_out = tk.Button(
+            frame,
+            text="Browse",
+            command=lambda: self.select_output_folder(self.output_folder_var),
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_browse_out.grid(row=5, column=2, sticky="w")
 
-        btn_compress = tk.Button(frame, text="Compress", command=self.start_compress_images, bg=self.accent, fg=self.fg, font=self.font)
+        btn_compress = tk.Button(
+            frame,
+            text="Compress",
+            command=self.start_compress_images,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_compress.grid(row=6, column=0, columnspan=3, pady=10, sticky="ew")
 
         self.progress = ttk.Progressbar(frame, mode="determinate")
         self.progress.grid(row=7, column=0, columnspan=3, sticky="ew")
 
     def select_images(self):
-        files = filedialog.askopenfilenames(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+        files = filedialog.askopenfilenames(
+            filetypes=[("Image files", "*.jpg *.jpeg *.png")]
+        )
         self.images = list(files)
         self.images_list.delete(0, tk.END)
         for f in files:
             self.images_list.insert(tk.END, os.path.basename(f))
 
     def start_compress_images(self):
-        if not hasattr(self, 'images') or not self.images:
+        if not hasattr(self, "images") or not self.images:
             messagebox.showerror("Error", "No images selected")
             return
         output = self.output_folder_var.get()
@@ -175,9 +250,12 @@ class MultiToolUtility:
             return
         width = self.width_var.get()
         height = self.height_var.get()
-        self.progress['maximum'] = len(self.images)
-        self.progress['value'] = 0
-        threading.Thread(target=self.compress_images_thread, args=(self.images, output, quality, width, height)).start()
+        self.progress["maximum"] = len(self.images)
+        self.progress["value"] = 0
+        threading.Thread(
+            target=self.compress_images_thread,
+            args=(self.images, output, quality, width, height),
+        ).start()
 
     def compress_images_thread(self, images, output, quality, width, height):
         for img_path in images:
@@ -187,16 +265,23 @@ class MultiToolUtility:
                     img = img.resize((width, height), Image.LANCZOS)
                 base, ext = os.path.splitext(os.path.basename(img_path))
                 out_path = os.path.join(output, f"{base}_compressed{ext}")
-                save_args = {'optimize': True}
-                if ext.lower() in ['.jpg', '.jpeg']:
-                    save_args['quality'] = quality
-                elif ext.lower() == '.png':
-                    save_args['compress_level'] = min(9, 10 - (quality // 10))
+                save_args = {"optimize": True}
+                if ext.lower() in [".jpg", ".jpeg"]:
+                    save_args["quality"] = quality
+                elif ext.lower() == ".png":
+                    save_args["compress_level"] = min(9, 10 - (quality // 10))
                 img.save(out_path, **save_args)
                 self.root.after(0, lambda: self.update_progress(self.progress))
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to compress {img_path}: {str(e)}"))
-        self.root.after(0, lambda: messagebox.showinfo("Success", "Image compression complete"))
+                self.root.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Error", f"Failed to compress {img_path}: {str(e)}"
+                    ),
+                )
+        self.root.after(
+            0, lambda: messagebox.showinfo("Success", "Image compression complete")
+        )
 
     # Tool 2: Compress Multiple Videos
     def compress_videos_tool(self):
@@ -205,41 +290,96 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Select Videos:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
-        self.videos_list = tk.Listbox(frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5)
+        tk.Label(
+            frame, text="Select Videos:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=0, column=0, sticky="w")
+        self.videos_list = tk.Listbox(
+            frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5
+        )
         self.videos_list.grid(row=1, column=0, columnspan=3, sticky="ew", pady=5)
-        btn_select = tk.Button(frame, text="Browse", command=self.select_videos, bg=self.accent, fg=self.fg, font=self.font)
+        btn_select = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_videos,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_select.grid(row=0, column=1, sticky="w")
 
-        tk.Label(frame, text="Target Resolution (e.g., 1280x720):", bg=self.bg, fg=self.fg, font=self.font).grid(row=2, column=0, sticky="w")
+        tk.Label(
+            frame,
+            text="Target Resolution (e.g., 1280x720):",
+            bg=self.bg,
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=2, column=0, sticky="w")
         self.resolution_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.resolution_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=2, column=1, sticky="ew")
+        tk.Entry(
+            frame,
+            textvariable=self.resolution_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=2, column=1, sticky="ew")
 
-        tk.Label(frame, text="Bitrate (e.g., 1000k):", bg=self.bg, fg=self.fg, font=self.font).grid(row=3, column=0, sticky="w")
+        tk.Label(
+            frame, text="Bitrate (e.g., 1000k):", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=3, column=0, sticky="w")
         self.bitrate_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.bitrate_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=3, column=1, sticky="ew")
+        tk.Entry(
+            frame,
+            textvariable=self.bitrate_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=3, column=1, sticky="ew")
 
-        tk.Label(frame, text="Output Folder:", bg=self.bg, fg=self.fg, font=self.font).grid(row=4, column=0, sticky="w")
+        tk.Label(
+            frame, text="Output Folder:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=4, column=0, sticky="w")
         self.video_output_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.video_output_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=4, column=1, sticky="ew")
-        btn_browse_out = tk.Button(frame, text="Browse", command=lambda: self.select_output_folder(self.video_output_var), bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.video_output_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=4, column=1, sticky="ew")
+        btn_browse_out = tk.Button(
+            frame,
+            text="Browse",
+            command=lambda: self.select_output_folder(self.video_output_var),
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_browse_out.grid(row=4, column=2, sticky="w")
 
-        btn_compress = tk.Button(frame, text="Compress", command=self.start_compress_videos, bg=self.accent, fg=self.fg, font=self.font)
+        btn_compress = tk.Button(
+            frame,
+            text="Compress",
+            command=self.start_compress_videos,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_compress.grid(row=5, column=0, columnspan=3, pady=10, sticky="ew")
 
         self.video_progress = ttk.Progressbar(frame, mode="determinate")
         self.video_progress.grid(row=6, column=0, columnspan=3, sticky="ew")
 
     def select_videos(self):
-        files = filedialog.askopenfilenames(filetypes=[("Video files", "*.mp4 *.avi *.mov")])
+        files = filedialog.askopenfilenames(
+            filetypes=[("Video files", "*.mp4 *.avi *.mov")]
+        )
         self.videos = list(files)
         self.videos_list.delete(0, tk.END)
         for f in files:
             self.videos_list.insert(tk.END, os.path.basename(f))
 
     def start_compress_videos(self):
-        if not hasattr(self, 'videos') or not self.videos:
+        if not hasattr(self, "videos") or not self.videos:
             messagebox.showerror("Error", "No videos selected")
             return
         output = self.video_output_var.get()
@@ -248,24 +388,39 @@ class MultiToolUtility:
             return
         resolution = self.resolution_var.get()
         bitrate = self.bitrate_var.get()
-        self.video_progress['maximum'] = len(self.videos)
-        self.video_progress['value'] = 0
-        threading.Thread(target=self.compress_videos_thread, args=(self.videos, output, resolution, bitrate)).start()
+        self.video_progress["maximum"] = len(self.videos)
+        self.video_progress["value"] = 0
+        threading.Thread(
+            target=self.compress_videos_thread,
+            args=(self.videos, output, resolution, bitrate),
+        ).start()
 
     def compress_videos_thread(self, videos, output, resolution, bitrate):
         for vid_path in videos:
             try:
                 clip = mp.VideoFileClip(vid_path)
                 if resolution:
-                    w, h = map(int, resolution.split('x'))
+                    w, h = map(int, resolution.split("x"))
                     clip = clip.resize((w, h))
                 base, ext = os.path.splitext(os.path.basename(vid_path))
                 out_path = os.path.join(output, f"{base}_compressed{ext}")
-                clip.write_videofile(out_path, bitrate=bitrate if bitrate else None, verbose=False, logger=None)
+                clip.write_videofile(
+                    out_path,
+                    bitrate=bitrate if bitrate else None,
+                    verbose=False,
+                    logger=None,
+                )
                 self.root.after(0, lambda: self.update_progress(self.video_progress))
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to compress {vid_path}: {str(e)}"))
-        self.root.after(0, lambda: messagebox.showinfo("Success", "Video compression complete"))
+                self.root.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Error", f"Failed to compress {vid_path}: {str(e)}"
+                    ),
+                )
+        self.root.after(
+            0, lambda: messagebox.showinfo("Success", "Video compression complete")
+        )
 
     # Tool 3: Remove Image Background
     def remove_background_tool(self):
@@ -274,42 +429,79 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Select Images:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
-        self.bg_images_list = tk.Listbox(frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5)
+        tk.Label(
+            frame, text="Select Images:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=0, column=0, sticky="w")
+        self.bg_images_list = tk.Listbox(
+            frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5
+        )
         self.bg_images_list.grid(row=1, column=0, columnspan=3, sticky="ew", pady=5)
-        btn_select = tk.Button(frame, text="Browse", command=self.select_bg_images, bg=self.accent, fg=self.fg, font=self.font)
+        btn_select = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_bg_images,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_select.grid(row=0, column=1, sticky="w")
 
-        tk.Label(frame, text="Output Folder:", bg=self.bg, fg=self.fg, font=self.font).grid(row=2, column=0, sticky="w")
+        tk.Label(
+            frame, text="Output Folder:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=2, column=0, sticky="w")
         self.bg_output_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.bg_output_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=2, column=1, sticky="ew")
-        btn_browse_out = tk.Button(frame, text="Browse", command=lambda: self.select_output_folder(self.bg_output_var), bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.bg_output_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=2, column=1, sticky="ew")
+        btn_browse_out = tk.Button(
+            frame,
+            text="Browse",
+            command=lambda: self.select_output_folder(self.bg_output_var),
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_browse_out.grid(row=2, column=2, sticky="w")
 
-        btn_remove = tk.Button(frame, text="Remove Background", command=self.start_remove_bg, bg=self.accent, fg=self.fg, font=self.font)
+        btn_remove = tk.Button(
+            frame,
+            text="Remove Background",
+            command=self.start_remove_bg,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_remove.grid(row=3, column=0, columnspan=3, pady=10, sticky="ew")
 
         self.bg_progress = ttk.Progressbar(frame, mode="determinate")
         self.bg_progress.grid(row=4, column=0, columnspan=3, sticky="ew")
 
     def select_bg_images(self):
-        files = filedialog.askopenfilenames(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+        files = filedialog.askopenfilenames(
+            filetypes=[("Image files", "*.jpg *.jpeg *.png")]
+        )
         self.bg_images = list(files)
         self.bg_images_list.delete(0, tk.END)
         for f in files:
             self.bg_images_list.insert(tk.END, os.path.basename(f))
 
     def start_remove_bg(self):
-        if not hasattr(self, 'bg_images') or not self.bg_images:
+        if not hasattr(self, "bg_images") or not self.bg_images:
             messagebox.showerror("Error", "No images selected")
             return
         output = self.bg_output_var.get()
         if not output:
             messagebox.showerror("Error", "No output folder selected")
             return
-        self.bg_progress['maximum'] = len(self.bg_images)
-        self.bg_progress['value'] = 0
-        threading.Thread(target=self.remove_bg_thread, args=(self.bg_images, output)).start()
+        self.bg_progress["maximum"] = len(self.bg_images)
+        self.bg_progress["value"] = 0
+        threading.Thread(
+            target=self.remove_bg_thread, args=(self.bg_images, output)
+        ).start()
 
     def remove_bg_thread(self, images, output):
         for img_path in images:
@@ -321,8 +513,15 @@ class MultiToolUtility:
                 output_img.save(out_path)
                 self.root.after(0, lambda: self.update_progress(self.bg_progress))
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to remove background for {img_path}: {str(e)}"))
-        self.root.after(0, lambda: messagebox.showinfo("Success", "Background removal complete"))
+                self.root.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Error", f"Failed to remove background for {img_path}: {str(e)}"
+                    ),
+                )
+        self.root.after(
+            0, lambda: messagebox.showinfo("Success", "Background removal complete")
+        )
 
     # Tool 4: Image to Text (OCR)
     def image_to_text_tool(self):
@@ -331,27 +530,71 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Select Image:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
+        tk.Label(
+            frame, text="Select Image:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=0, column=0, sticky="w")
         self.ocr_image_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.ocr_image_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=0, column=1, sticky="ew")
-        btn_select = tk.Button(frame, text="Browse", command=self.select_ocr_image, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.ocr_image_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=0, column=1, sticky="ew")
+        btn_select = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_ocr_image,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_select.grid(row=0, column=2, sticky="w")
 
-        btn_extract = tk.Button(frame, text="Extract Text", command=self.start_ocr_image, bg=self.accent, fg=self.fg, font=self.font)
+        btn_extract = tk.Button(
+            frame,
+            text="Extract Text",
+            command=self.start_ocr_image,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_extract.grid(row=1, column=0, columnspan=3, pady=10, sticky="ew")
 
-        tk.Label(frame, text="Extracted Text:", bg=self.bg, fg=self.fg, font=self.font).grid(row=2, column=0, sticky="nw")
-        self.ocr_text = tk.Text(frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=10)
+        tk.Label(
+            frame, text="Extracted Text:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=2, column=0, sticky="nw")
+        self.ocr_text = tk.Text(
+            frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=10
+        )
         self.ocr_text.grid(row=3, column=0, columnspan=3, sticky="nsew", pady=5)
         frame.rowconfigure(3, weight=1)
 
-        btn_copy = tk.Button(frame, text="Copy", command=lambda: self.root.clipboard_append(self.ocr_text.get("1.0", tk.END)), bg=self.accent, fg=self.fg, font=self.font)
+        btn_copy = tk.Button(
+            frame,
+            text="Copy",
+            command=lambda: self.root.clipboard_append(
+                self.ocr_text.get("1.0", tk.END)
+            ),
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_copy.grid(row=4, column=0, sticky="w")
-        btn_save = tk.Button(frame, text="Save to File", command=self.save_ocr_text, bg=self.accent, fg=self.fg, font=self.font)
+        btn_save = tk.Button(
+            frame,
+            text="Save to File",
+            command=self.save_ocr_text,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_save.grid(row=4, column=1, sticky="w")
 
     def select_ocr_image(self):
-        file = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+        file = filedialog.askopenfilename(
+            filetypes=[("Image files", "*.jpg *.jpeg *.png")]
+        )
         if file:
             self.ocr_image_var.set(file)
 
@@ -368,14 +611,18 @@ class MultiToolUtility:
             text = pytesseract.image_to_string(Image.open(img_path))
             self.root.after(0, lambda: self.ocr_text.insert(tk.END, text))
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Error", f"OCR failed: {str(e)}"))
+            self.root.after(
+                0, lambda: messagebox.showerror("Error", f"OCR failed: {str(e)}")
+            )
 
     def save_ocr_text(self):
         text = self.ocr_text.get("1.0", tk.END).strip()
         if not text:
             messagebox.showerror("Error", "No text to save")
             return
-        file = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+        file = filedialog.asksaveasfilename(
+            defaultextension=".txt", filetypes=[("Text files", "*.txt")]
+        )
         if file:
             with open(file, "w") as f:
                 f.write(text)
@@ -387,23 +634,65 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Select PDF:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
+        tk.Label(
+            frame, text="Select PDF:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=0, column=0, sticky="w")
         self.pdf_text_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.pdf_text_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=0, column=1, sticky="ew")
-        btn_select = tk.Button(frame, text="Browse", command=self.select_pdf_for_text, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.pdf_text_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=0, column=1, sticky="ew")
+        btn_select = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_pdf_for_text,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_select.grid(row=0, column=2, sticky="w")
 
-        btn_extract = tk.Button(frame, text="Extract Text", command=self.start_pdf_text, bg=self.accent, fg=self.fg, font=self.font)
+        btn_extract = tk.Button(
+            frame,
+            text="Extract Text",
+            command=self.start_pdf_text,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_extract.grid(row=1, column=0, columnspan=3, pady=10, sticky="ew")
 
-        tk.Label(frame, text="Extracted Text:", bg=self.bg, fg=self.fg, font=self.font).grid(row=2, column=0, sticky="nw")
-        self.pdf_ocr_text = tk.Text(frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=10)
+        tk.Label(
+            frame, text="Extracted Text:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=2, column=0, sticky="nw")
+        self.pdf_ocr_text = tk.Text(
+            frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=10
+        )
         self.pdf_ocr_text.grid(row=3, column=0, columnspan=3, sticky="nsew", pady=5)
         frame.rowconfigure(3, weight=1)
 
-        btn_copy = tk.Button(frame, text="Copy", command=lambda: self.root.clipboard_append(self.pdf_ocr_text.get("1.0", tk.END)), bg=self.accent, fg=self.fg, font=self.font)
+        btn_copy = tk.Button(
+            frame,
+            text="Copy",
+            command=lambda: self.root.clipboard_append(
+                self.pdf_ocr_text.get("1.0", tk.END)
+            ),
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_copy.grid(row=4, column=0, sticky="w")
-        btn_save = tk.Button(frame, text="Save to File", command=self.save_pdf_text, bg=self.accent, fg=self.fg, font=self.font)
+        btn_save = tk.Button(
+            frame,
+            text="Save to File",
+            command=self.save_pdf_text,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_save.grid(row=4, column=1, sticky="w")
 
         self.pdf_progress = ttk.Progressbar(frame, mode="determinate")
@@ -423,9 +712,11 @@ class MultiToolUtility:
         with open(pdf_path, "rb") as f:
             reader = PdfReader(f)
             num_pages = len(reader.pages)
-            self.pdf_progress['maximum'] = num_pages
-            self.pdf_progress['value'] = 0
-        threading.Thread(target=self.pdf_text_thread, args=(pdf_path, num_pages)).start()
+            self.pdf_progress["maximum"] = num_pages
+            self.pdf_progress["value"] = 0
+        threading.Thread(
+            target=self.pdf_text_thread, args=(pdf_path, num_pages)
+        ).start()
 
     def pdf_text_thread(self, pdf_path, num_pages):
         text = ""
@@ -438,21 +729,32 @@ class MultiToolUtility:
                         text += page_text + "\n\n"
                     else:
                         # Fallback to OCR
-                        images = pdf2image.convert_from_path(pdf_path, first_page=page_num+1, last_page=page_num+1)
+                        images = pdf2image.convert_from_path(
+                            pdf_path, first_page=page_num + 1, last_page=page_num + 1
+                        )
                         ocr_text = pytesseract.image_to_string(images[0])
                         text += ocr_text + "\n\n"
                 self.root.after(0, lambda: self.update_progress(self.pdf_progress))
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Failed on page {page_num+1}: {str(e)}"))
+                self.root.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Error", f"Failed on page {page_num+1}: {str(e)}"
+                    ),
+                )
         self.root.after(0, lambda: self.pdf_ocr_text.insert(tk.END, text))
-        self.root.after(0, lambda: messagebox.showinfo("Success", "PDF text extraction complete"))
+        self.root.after(
+            0, lambda: messagebox.showinfo("Success", "PDF text extraction complete")
+        )
 
     def save_pdf_text(self):
         text = self.pdf_ocr_text.get("1.0", tk.END).strip()
         if not text:
             messagebox.showerror("Error", "No text to save")
             return
-        file = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+        file = filedialog.asksaveasfilename(
+            defaultextension=".txt", filetypes=[("Text files", "*.txt")]
+        )
         if file:
             with open(file, "w") as f:
                 f.write(text)
@@ -464,32 +766,98 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Length:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
+        tk.Label(frame, text="Length:", bg=self.bg, fg=self.fg, font=self.font).grid(
+            row=0, column=0, sticky="w"
+        )
         self.pw_length_var = tk.IntVar(value=12)
-        tk.Entry(frame, textvariable=self.pw_length_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=0, column=1, sticky="ew")
+        tk.Entry(
+            frame,
+            textvariable=self.pw_length_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=0, column=1, sticky="ew")
 
-        tk.Label(frame, text="Quantity:", bg=self.bg, fg=self.fg, font=self.font).grid(row=1, column=0, sticky="w")
+        tk.Label(frame, text="Quantity:", bg=self.bg, fg=self.fg, font=self.font).grid(
+            row=1, column=0, sticky="w"
+        )
         self.pw_qty_var = tk.IntVar(value=1)
-        tk.Entry(frame, textvariable=self.pw_qty_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=1, column=1, sticky="ew")
+        tk.Entry(
+            frame,
+            textvariable=self.pw_qty_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=1, column=1, sticky="ew")
 
         self.pw_upper = tk.BooleanVar(value=True)
-        tk.Checkbutton(frame, text="Uppercase", variable=self.pw_upper, bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=2, column=0, sticky="w")
+        tk.Checkbutton(
+            frame,
+            text="Uppercase",
+            variable=self.pw_upper,
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=2, column=0, sticky="w")
         self.pw_lower = tk.BooleanVar(value=True)
-        tk.Checkbutton(frame, text="Lowercase", variable=self.pw_lower, bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=3, column=0, sticky="w")
+        tk.Checkbutton(
+            frame,
+            text="Lowercase",
+            variable=self.pw_lower,
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=3, column=0, sticky="w")
         self.pw_numbers = tk.BooleanVar(value=True)
-        tk.Checkbutton(frame, text="Numbers", variable=self.pw_numbers, bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=4, column=0, sticky="w")
+        tk.Checkbutton(
+            frame,
+            text="Numbers",
+            variable=self.pw_numbers,
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=4, column=0, sticky="w")
         self.pw_symbols = tk.BooleanVar(value=True)
-        tk.Checkbutton(frame, text="Symbols", variable=self.pw_symbols, bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=5, column=0, sticky="w")
+        tk.Checkbutton(
+            frame,
+            text="Symbols",
+            variable=self.pw_symbols,
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=5, column=0, sticky="w")
 
-        btn_generate = tk.Button(frame, text="Generate", command=self.generate_passwords, bg=self.accent, fg=self.fg, font=self.font)
+        btn_generate = tk.Button(
+            frame,
+            text="Generate",
+            command=self.generate_passwords,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_generate.grid(row=6, column=0, columnspan=2, pady=10, sticky="ew")
 
-        tk.Label(frame, text="Generated Passwords:", bg=self.bg, fg=self.fg, font=self.font).grid(row=7, column=0, sticky="nw")
-        self.pw_text = tk.Text(frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=10)
+        tk.Label(
+            frame, text="Generated Passwords:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=7, column=0, sticky="nw")
+        self.pw_text = tk.Text(
+            frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=10
+        )
         self.pw_text.grid(row=8, column=0, columnspan=2, sticky="nsew", pady=5)
         frame.rowconfigure(8, weight=1)
 
-        btn_copy = tk.Button(frame, text="Copy All", command=lambda: self.root.clipboard_append(self.pw_text.get("1.0", tk.END)), bg=self.accent, fg=self.fg, font=self.font)
+        btn_copy = tk.Button(
+            frame,
+            text="Copy All",
+            command=lambda: self.root.clipboard_append(self.pw_text.get("1.0", tk.END)),
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_copy.grid(row=9, column=0, sticky="w")
 
     def generate_passwords(self):
@@ -523,27 +891,87 @@ class MultiToolUtility:
         frame.columnconfigure(1, weight=3)
 
         self.hash_type_var = tk.StringVar(value="Text")
-        tk.Radiobutton(frame, text="Text", variable=self.hash_type_var, value="Text", bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=0, column=0, sticky="w")
-        tk.Radiobutton(frame, text="File", variable=self.hash_type_var, value="File", bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=0, column=1, sticky="w")
+        tk.Radiobutton(
+            frame,
+            text="Text",
+            variable=self.hash_type_var,
+            value="Text",
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=0, column=0, sticky="w")
+        tk.Radiobutton(
+            frame,
+            text="File",
+            variable=self.hash_type_var,
+            value="File",
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=0, column=1, sticky="w")
 
-        tk.Label(frame, text="Input:", bg=self.bg, fg=self.fg, font=self.font).grid(row=1, column=0, sticky="w")
+        tk.Label(frame, text="Input:", bg=self.bg, fg=self.fg, font=self.font).grid(
+            row=1, column=0, sticky="w"
+        )
         self.hash_input_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.hash_input_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=1, column=1, sticky="ew")
-        btn_browse = tk.Button(frame, text="Browse File", command=self.select_hash_file, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.hash_input_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=1, column=1, sticky="ew")
+        btn_browse = tk.Button(
+            frame,
+            text="Browse File",
+            command=self.select_hash_file,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_browse.grid(row=1, column=2, sticky="w")
 
-        tk.Label(frame, text="Algorithm:", bg=self.bg, fg=self.fg, font=self.font).grid(row=2, column=0, sticky="w")
+        tk.Label(frame, text="Algorithm:", bg=self.bg, fg=self.fg, font=self.font).grid(
+            row=2, column=0, sticky="w"
+        )
         self.hash_algo_var = tk.StringVar(value="SHA-256")
         algos = ["MD5", "SHA-1", "SHA-256", "SHA-512"]
-        tk.OptionMenu(frame, self.hash_algo_var, *algos).grid(row=2, column=1, sticky="ew")
+        tk.OptionMenu(frame, self.hash_algo_var, *algos).grid(
+            row=2, column=1, sticky="ew"
+        )
 
-        btn_compute = tk.Button(frame, text="Compute Hash", command=self.compute_hash, bg=self.accent, fg=self.fg, font=self.font)
+        btn_compute = tk.Button(
+            frame,
+            text="Compute Hash",
+            command=self.compute_hash,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_compute.grid(row=3, column=0, columnspan=3, pady=10, sticky="ew")
 
-        tk.Label(frame, text="Hash:", bg=self.bg, fg=self.fg, font=self.font).grid(row=4, column=0, sticky="w")
+        tk.Label(frame, text="Hash:", bg=self.bg, fg=self.fg, font=self.font).grid(
+            row=4, column=0, sticky="w"
+        )
         self.hash_result_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.hash_result_var, bg="#3c3c3c", fg=self.fg, font=self.font, state="readonly").grid(row=4, column=1, sticky="ew")
-        btn_copy = tk.Button(frame, text="Copy", command=lambda: self.root.clipboard_append(self.hash_result_var.get()), bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.hash_result_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+            state="readonly",
+        ).grid(row=4, column=1, sticky="ew")
+        btn_copy = tk.Button(
+            frame,
+            text="Copy",
+            command=lambda: self.root.clipboard_append(self.hash_result_var.get()),
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_copy.grid(row=4, column=2, sticky="w")
 
     def select_hash_file(self):
@@ -577,35 +1005,116 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Algorithm:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
+        tk.Label(frame, text="Algorithm:", bg=self.bg, fg=self.fg, font=self.font).grid(
+            row=0, column=0, sticky="w"
+        )
         self.compare_algo_var = tk.StringVar(value="SHA-256")
         algos = ["MD5", "SHA-1", "SHA-256", "SHA-512"]
-        tk.OptionMenu(frame, self.compare_algo_var, *algos).grid(row=0, column=1, sticky="ew")
+        tk.OptionMenu(frame, self.compare_algo_var, *algos).grid(
+            row=0, column=1, sticky="ew"
+        )
 
         # Input 1
         self.compare_type1_var = tk.StringVar(value="Text")
-        tk.Radiobutton(frame, text="Text1", variable=self.compare_type1_var, value="Text", bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=1, column=0, sticky="w")
-        tk.Radiobutton(frame, text="File1", variable=self.compare_type1_var, value="File", bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=1, column=1, sticky="w")
+        tk.Radiobutton(
+            frame,
+            text="Text1",
+            variable=self.compare_type1_var,
+            value="Text",
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=1, column=0, sticky="w")
+        tk.Radiobutton(
+            frame,
+            text="File1",
+            variable=self.compare_type1_var,
+            value="File",
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=1, column=1, sticky="w")
         self.compare_input1_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.compare_input1_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=2, column=0, columnspan=2, sticky="ew")
-        btn_browse1 = tk.Button(frame, text="Browse", command=self.select_compare_file1, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.compare_input1_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=2, column=0, columnspan=2, sticky="ew")
+        btn_browse1 = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_compare_file1,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_browse1.grid(row=2, column=2, sticky="w")
 
         # Input 2
         self.compare_type2_var = tk.StringVar(value="Text")
-        tk.Radiobutton(frame, text="Text2", variable=self.compare_type2_var, value="Text", bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=3, column=0, sticky="w")
-        tk.Radiobutton(frame, text="File2", variable=self.compare_type2_var, value="File", bg=self.bg, fg=self.fg, selectcolor=self.accent, font=self.font).grid(row=3, column=1, sticky="w")
+        tk.Radiobutton(
+            frame,
+            text="Text2",
+            variable=self.compare_type2_var,
+            value="Text",
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=3, column=0, sticky="w")
+        tk.Radiobutton(
+            frame,
+            text="File2",
+            variable=self.compare_type2_var,
+            value="File",
+            bg=self.bg,
+            fg=self.fg,
+            selectcolor=self.accent,
+            font=self.font,
+        ).grid(row=3, column=1, sticky="w")
         self.compare_input2_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.compare_input2_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=4, column=0, columnspan=2, sticky="ew")
-        btn_browse2 = tk.Button(frame, text="Browse", command=self.select_compare_file2, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.compare_input2_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=4, column=0, columnspan=2, sticky="ew")
+        btn_browse2 = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_compare_file2,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_browse2.grid(row=4, column=2, sticky="w")
 
-        btn_compare = tk.Button(frame, text="Compare", command=self.compare_hashes, bg=self.accent, fg=self.fg, font=self.font)
+        btn_compare = tk.Button(
+            frame,
+            text="Compare",
+            command=self.compare_hashes,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_compare.grid(row=5, column=0, columnspan=3, pady=10, sticky="ew")
 
-        tk.Label(frame, text="Result:", bg=self.bg, fg=self.fg, font=self.font).grid(row=6, column=0, sticky="w")
+        tk.Label(frame, text="Result:", bg=self.bg, fg=self.fg, font=self.font).grid(
+            row=6, column=0, sticky="w"
+        )
         self.compare_result_var = tk.StringVar()
-        tk.Label(frame, textvariable=self.compare_result_var, bg=self.bg, fg=self.fg, font=self.font).grid(row=6, column=1, sticky="w")
+        tk.Label(
+            frame,
+            textvariable=self.compare_result_var,
+            bg=self.bg,
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=6, column=1, sticky="w")
 
     def select_compare_file1(self):
         if self.compare_type1_var.get() == "File":
@@ -653,26 +1162,66 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Key/Password:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
+        tk.Label(
+            frame, text="Key/Password:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=0, column=0, sticky="w")
         self.crypto_key_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.crypto_key_var, bg="#3c3c3c", fg=self.fg, font=self.font, show="*").grid(row=0, column=1, sticky="ew")
+        tk.Entry(
+            frame,
+            textvariable=self.crypto_key_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+            show="*",
+        ).grid(row=0, column=1, sticky="ew")
 
-        tk.Label(frame, text="Input Text:", bg=self.bg, fg=self.fg, font=self.font).grid(row=1, column=0, sticky="nw")
-        self.crypto_input = tk.Text(frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5)
+        tk.Label(
+            frame, text="Input Text:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=1, column=0, sticky="nw")
+        self.crypto_input = tk.Text(
+            frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5
+        )
         self.crypto_input.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=5)
         frame.rowconfigure(2, weight=1)
 
-        btn_encrypt = tk.Button(frame, text="Encrypt", command=self.encrypt_text, bg=self.accent, fg=self.fg, font=self.font)
+        btn_encrypt = tk.Button(
+            frame,
+            text="Encrypt",
+            command=self.encrypt_text,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_encrypt.grid(row=3, column=0, pady=10, sticky="ew")
-        btn_decrypt = tk.Button(frame, text="Decrypt", command=self.decrypt_text, bg=self.accent, fg=self.fg, font=self.font)
+        btn_decrypt = tk.Button(
+            frame,
+            text="Decrypt",
+            command=self.decrypt_text,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_decrypt.grid(row=3, column=1, pady=10, sticky="ew")
 
-        tk.Label(frame, text="Output:", bg=self.bg, fg=self.fg, font=self.font).grid(row=4, column=0, sticky="nw")
-        self.crypto_output = tk.Text(frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5)
+        tk.Label(frame, text="Output:", bg=self.bg, fg=self.fg, font=self.font).grid(
+            row=4, column=0, sticky="nw"
+        )
+        self.crypto_output = tk.Text(
+            frame, bg="#3c3c3c", fg=self.fg, font=self.font, height=5
+        )
         self.crypto_output.grid(row=5, column=0, columnspan=3, sticky="nsew", pady=5)
         frame.rowconfigure(5, weight=1)
 
-        btn_copy = tk.Button(frame, text="Copy Output", command=lambda: self.root.clipboard_append(self.crypto_output.get("1.0", tk.END)), bg=self.accent, fg=self.fg, font=self.font)
+        btn_copy = tk.Button(
+            frame,
+            text="Copy Output",
+            command=lambda: self.root.clipboard_append(
+                self.crypto_output.get("1.0", tk.END)
+            ),
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_copy.grid(row=6, column=0, sticky="w")
 
     def get_fernet_key(self, password):
@@ -718,19 +1267,56 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Select PDF:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
+        tk.Label(
+            frame, text="Select PDF:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=0, column=0, sticky="w")
         self.pdf_word_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.pdf_word_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=0, column=1, sticky="ew")
-        btn_select = tk.Button(frame, text="Browse", command=self.select_pdf_for_word, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.pdf_word_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=0, column=1, sticky="ew")
+        btn_select = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_pdf_for_word,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_select.grid(row=0, column=2, sticky="w")
 
-        tk.Label(frame, text="Output .docx:", bg=self.bg, fg=self.fg, font=self.font).grid(row=1, column=0, sticky="w")
+        tk.Label(
+            frame, text="Output .docx:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=1, column=0, sticky="w")
         self.word_output_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.word_output_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=1, column=1, sticky="ew")
-        btn_save = tk.Button(frame, text="Browse", command=self.select_word_output, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.word_output_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=1, column=1, sticky="ew")
+        btn_save = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_word_output,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_save.grid(row=1, column=2, sticky="w")
 
-        btn_convert = tk.Button(frame, text="Convert", command=self.start_pdf_to_word, bg=self.accent, fg=self.fg, font=self.font)
+        btn_convert = tk.Button(
+            frame,
+            text="Convert",
+            command=self.start_pdf_to_word,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_convert.grid(row=2, column=0, columnspan=3, pady=10, sticky="ew")
 
         self.word_progress = ttk.Progressbar(frame, mode="determinate")
@@ -742,7 +1328,9 @@ class MultiToolUtility:
             self.pdf_word_var.set(file)
 
     def select_word_output(self):
-        file = filedialog.asksaveasfilename(defaultextension=".docx", filetypes=[("Word files", "*.docx")])
+        file = filedialog.asksaveasfilename(
+            defaultextension=".docx", filetypes=[("Word files", "*.docx")]
+        )
         if file:
             self.word_output_var.set(file)
 
@@ -754,9 +1342,11 @@ class MultiToolUtility:
             return
         with pdfplumber.open(pdf_path) as pdf:
             num_pages = len(pdf.pages)
-            self.word_progress['maximum'] = num_pages
-            self.word_progress['value'] = 0
-        threading.Thread(target=self.pdf_to_word_thread, args=(pdf_path, word_path, num_pages)).start()
+            self.word_progress["maximum"] = num_pages
+            self.word_progress["value"] = 0
+        threading.Thread(
+            target=self.pdf_to_word_thread, args=(pdf_path, word_path, num_pages)
+        ).start()
 
     def pdf_to_word_thread(self, pdf_path, word_path, num_pages):
         doc = Document()
@@ -775,9 +1365,16 @@ class MultiToolUtility:
                                 doc.add_picture(buf)
                     self.root.after(0, lambda: self.update_progress(self.word_progress))
             doc.save(word_path)
-            self.root.after(0, lambda: messagebox.showinfo("Success", "PDF to Word conversion complete"))
+            self.root.after(
+                0,
+                lambda: messagebox.showinfo(
+                    "Success", "PDF to Word conversion complete"
+                ),
+            )
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Error", f"Conversion failed: {str(e)}"))
+            self.root.after(
+                0, lambda: messagebox.showerror("Error", f"Conversion failed: {str(e)}")
+            )
 
     # Tool 11: PDF to Excel
     def pdf_to_excel_tool(self):
@@ -786,19 +1383,56 @@ class MultiToolUtility:
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=3)
 
-        tk.Label(frame, text="Select PDF:", bg=self.bg, fg=self.fg, font=self.font).grid(row=0, column=0, sticky="w")
+        tk.Label(
+            frame, text="Select PDF:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=0, column=0, sticky="w")
         self.pdf_excel_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.pdf_excel_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=0, column=1, sticky="ew")
-        btn_select = tk.Button(frame, text="Browse", command=self.select_pdf_for_excel, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.pdf_excel_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=0, column=1, sticky="ew")
+        btn_select = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_pdf_for_excel,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_select.grid(row=0, column=2, sticky="w")
 
-        tk.Label(frame, text="Output .xlsx:", bg=self.bg, fg=self.fg, font=self.font).grid(row=1, column=0, sticky="w")
+        tk.Label(
+            frame, text="Output .xlsx:", bg=self.bg, fg=self.fg, font=self.font
+        ).grid(row=1, column=0, sticky="w")
         self.excel_output_var = tk.StringVar()
-        tk.Entry(frame, textvariable=self.excel_output_var, bg="#3c3c3c", fg=self.fg, font=self.font).grid(row=1, column=1, sticky="ew")
-        btn_save = tk.Button(frame, text="Browse", command=self.select_excel_output, bg=self.accent, fg=self.fg, font=self.font)
+        tk.Entry(
+            frame,
+            textvariable=self.excel_output_var,
+            bg="#3c3c3c",
+            fg=self.fg,
+            font=self.font,
+        ).grid(row=1, column=1, sticky="ew")
+        btn_save = tk.Button(
+            frame,
+            text="Browse",
+            command=self.select_excel_output,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_save.grid(row=1, column=2, sticky="w")
 
-        btn_convert = tk.Button(frame, text="Convert", command=self.start_pdf_to_excel, bg=self.accent, fg=self.fg, font=self.font)
+        btn_convert = tk.Button(
+            frame,
+            text="Convert",
+            command=self.start_pdf_to_excel,
+            bg=self.accent,
+            fg=self.fg,
+            font=self.font,
+        )
         btn_convert.grid(row=2, column=0, columnspan=3, pady=10, sticky="ew")
 
         self.excel_progress = ttk.Progressbar(frame, mode="determinate")
@@ -810,7 +1444,9 @@ class MultiToolUtility:
             self.pdf_excel_var.set(file)
 
     def select_excel_output(self):
-        file = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
+        file = filedialog.asksaveasfilename(
+            defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")]
+        )
         if file:
             self.excel_output_var.set(file)
 
@@ -822,12 +1458,14 @@ class MultiToolUtility:
             return
         with pdfplumber.open(pdf_path) as pdf:
             num_pages = len(pdf.pages)
-            self.excel_progress['maximum'] = num_pages
-            self.excel_progress['value'] = 0
-        threading.Thread(target=self.pdf_to_excel_thread, args=(pdf_path, excel_path, num_pages)).start()
+            self.excel_progress["maximum"] = num_pages
+            self.excel_progress["value"] = 0
+        threading.Thread(
+            target=self.pdf_to_excel_thread, args=(pdf_path, excel_path, num_pages)
+        ).start()
 
     def pdf_to_excel_thread(self, pdf_path, excel_path, num_pages):
-        writer = pd.ExcelWriter(excel_path, engine='openpyxl')
+        writer = pd.ExcelWriter(excel_path, engine="openpyxl")
         sheet_num = 1
         try:
             with pdfplumber.open(pdf_path) as pdf:
@@ -837,11 +1475,20 @@ class MultiToolUtility:
                         df = pd.DataFrame(table[1:], columns=table[0])
                         df.to_excel(writer, sheet_name=f"Sheet{sheet_num}", index=False)
                         sheet_num += 1
-                    self.root.after(0, lambda: self.update_progress(self.excel_progress))
+                    self.root.after(
+                        0, lambda: self.update_progress(self.excel_progress)
+                    )
             writer.close()
-            self.root.after(0, lambda: messagebox.showinfo("Success", "PDF to Excel conversion complete"))
+            self.root.after(
+                0,
+                lambda: messagebox.showinfo(
+                    "Success", "PDF to Excel conversion complete"
+                ),
+            )
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Error", f"Conversion failed: {str(e)}"))
+            self.root.after(
+                0, lambda: messagebox.showerror("Error", f"Conversion failed: {str(e)}")
+            )
 
     # Tool 12: Help/About
     def help_about_tool(self):
@@ -870,6 +1517,7 @@ For issues, ensure all dependencies are installed.
         """
         text.insert(tk.END, help_content)
         text.config(state="disabled")
+
 
 if __name__ == "__main__":
     root = tk.Tk()

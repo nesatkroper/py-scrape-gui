@@ -6,6 +6,8 @@ import os
 import re
 import sys
 import platform
+import time
+import webbrowser
 
 customtkinter.set_appearance_mode("System")
 customtkinter.set_default_color_theme("blue")
@@ -22,10 +24,15 @@ class YouTubeDownloaderApp(customtkinter.CTk):
     A modern, minimal YouTube Channel Downloader GUI built with CustomTkinter.
     Uses yt-dlp via subprocess for robust downloading and real-time progress.
     """
+
+    def open_telegram(event=None):
+        webbrowser.open("https://t.me/devphanun") 
+
+
     def __init__(self):
         super().__init__()
 
-        self.title("Minimal YouTube Channel Downloader")
+        self.title("NunTube Downloader")
         self.geometry("700x650")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(5, weight=1)
@@ -61,8 +68,26 @@ class YouTubeDownloaderApp(customtkinter.CTk):
         self.progress_bar.grid(row=4, column=0, padx=20, pady=(10, 5), sticky="ew")
         self.progress_bar.set(0)
 
-        self.status_label = customtkinter.CTkLabel(self, text=f"Ready. Default path: {DEFAULT_DOWNLOAD_DIR}", text_color="gray")
-        self.status_label.grid(row=6, column=0, padx=20, pady=(5, 20), sticky="ew")
+        # self.status_label = customtkinter.CTkLabel(self, text=f"Ready. Default path: {DEFAULT_DOWNLOAD_DIR}", text_color="gray")
+        # self.status_label.grid(row=6, column=0, padx=20, pady=(5, 20), sticky="ew")
+        self.footer_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        self.footer_frame.grid(row=6, column=0, padx=20, pady=(5, 20), sticky="ew")
+
+        self.status_label = customtkinter.CTkLabel(
+            self.footer_frame,
+            text="Developed with love ❤️ ",
+            text_color="gray"
+        )
+        self.status_label.pack(side="left", padx=(10, 0))
+
+        self.name_label = customtkinter.CTkLabel(
+            self.footer_frame,
+            text="Suon Phanun",
+            text_color="white",
+            cursor="hand2"
+        )
+        self.name_label.pack(side="left")
+        self.name_label.bind("<Button-1>", self.open_telegram)
         
         self.log_text = customtkinter.CTkTextbox(self, width=500, height=200, state="disabled")
         self.log_text.grid(row=5, column=0, padx=20, pady=10, sticky="nsew")
@@ -137,7 +162,7 @@ class YouTubeDownloaderApp(customtkinter.CTk):
         self.url_entry.configure(state="disabled")
         self.path_entry.configure(state="disabled")
         self.browse_button.configure(state="disabled")
-        self.action_button.configure(text="Stop Download", fg_color="dark-blue", hover_color="#21618C")
+        self.action_button.configure(text="Stop Download", fg_color="#2A61AE", hover_color="#21618C")
         self.progress_bar.set(0)
         self.completed_videos = 0
         self.total_videos = 0

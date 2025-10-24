@@ -13,7 +13,7 @@ clear:
 	source venv/bin/activate.fish
 
 dev:
-	python src/app/app.py
+	python src/app.py
 
 i: 
 	pip install -r requirements.txt

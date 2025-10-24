@@ -42,6 +42,7 @@ pyinstaller --noconfirm \
             --windowed \
             --name "$APP_NAME" \
             --icon "$LOGO_FILE" \
+            --add-data "$LOGO_FILE:assets" \
             "$APP_FILE"
 
 # Copy the Windows executable to the release folder
@@ -61,6 +62,7 @@ pyinstaller --noconfirm \
             --windowed \
             --name "$APP_NAME" \
             --icon "$LOGO_FILE" \
+            --add-data "$LOGO_FILE:assets" \
             "$APP_FILE"
 
 # --- 4. Package into Debian (.deb) ---

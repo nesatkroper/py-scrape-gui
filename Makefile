@@ -4,6 +4,7 @@ git:
 	git add . 
 	git commit -m 'modified nun' 
 	git push
+	git push nun
 
 clear: 
 	rm -rf venv

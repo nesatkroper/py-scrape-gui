@@ -1,9 +1,0 @@
-Package: nun-info
-Version: 1.0
-Section: utils
-Priority: optional
-Architecture: all
-Depends: python3
-Maintainer: nun
-Description: Nun Info - IP and Network Information Tool
- A simple app to show your IP and network info.

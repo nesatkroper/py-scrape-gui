@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Nun Scrape
-Comment=Scrape data from websites easily
-Exec=python3 ~/.local/share/nun-scrape/scrape.py
-Icon=~/.local/share/nun-scrape/crawling.png
-Terminal=false
-Type=Application
-Categories=Network;Utility;Development;

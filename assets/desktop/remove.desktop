@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Nun Remove
-Comment=Remove apps and clean your system easily
-Exec=python3 ~/.local/share/nun-remove/remove.py
-Icon=~/.local/share/nun-remove/programming.png
-Terminal=false
-Type=Application
-Categories=Utility;System;

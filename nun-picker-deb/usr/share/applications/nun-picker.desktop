@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Nun Picker
-Comment=Pick and identify colors from your screen
-Exec=python3 /usr/local/bin/picker.py
-Icon=/usr/share/icons/nun-picker.png
-Terminal=false
-Type=Application
-Categories=Graphics;Utility;

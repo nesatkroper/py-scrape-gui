@@ -1,9 +1,0 @@
-Package: nun-scrape
-Version: 1.0
-Section: web
-Priority: optional
-Architecture: all
-Depends: python3
-Maintainer: nun
-Description: Nun Scrape - Web Scraping Tool
- A lightweight GUI tool for extracting data from websites quickly and easily.

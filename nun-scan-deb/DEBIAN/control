@@ -1,9 +1,0 @@
-Package: nun-scan
-Version: 1.0
-Section: network
-Priority: optional
-Architecture: all
-Depends: python3
-Maintainer: nun
-Description: Nun Scan - Network Scanner and Analyzer
- A simple, user-friendly network scanning tool for discovering connected devices and open ports.

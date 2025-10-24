@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Nun Media
-Comment=Media tool using MoviePy and Rembg
-Exec=/usr/local/bin/g-media.py
-Icon=/usr/share/icons/nun-media.png
-Terminal=false
-Type=Application
-Categories=Utility;Multimedia;

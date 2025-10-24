@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Nun Check
-Comment=Check your IP and network info
-Exec=python3 /usr/local/bin/ip-check.py
-Icon=/usr/share/icons/nun-info.png
-Terminal=false
-Type=Application
-Categories=Utility;Network;
